@@ -6,8 +6,11 @@ Implemenation from game's side is not included at the moment.
 
 ## Building
 To build Yarn you'll need dotnet 6.x (and git bash if you are on Windows).
+
 Then run "sync-yarnspinner-dlls.sh", and if everything is good and code isn't messed up, it should build all Dlls in to "Output" folder. 
+
 Then move content of "Output" folder in to " (your YarnSpinner-Unity-2.4.0 folder in project)/Runtime/DLLs/" folder.
+
 That should do it.
 
 P.S:
