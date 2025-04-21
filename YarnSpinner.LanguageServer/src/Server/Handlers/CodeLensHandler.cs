@@ -1,18 +1,17 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace YarnLanguageServer.Handlers
 {
     internal class CodeLensHandler : ICodeLensHandler
     {
-        private readonly Workspace workspace;
+        private Workspace workspace;
 
         public CodeLensHandler(Workspace workspace)
         {
@@ -31,18 +30,8 @@ namespace YarnLanguageServer.Handlers
                 return Task.FromResult(new CodeLensContainer());
             }
 
-            var results = yarnFile.NodeInfos.SelectMany(nodeInfo =>
+            var results = yarnFile.NodeDefinitions.SelectMany(titleToken =>
                {
-                   var titleToken = nodeInfo.TitleToken;
-
-                   if (titleToken == null || titleToken.StartIndex == -1)
-                   {
-                       // This is an error token - the node doesn't actually
-                       // have a valid title. Return an empty collection of code
-                       // lenses.
-                       return Enumerable.Empty<CodeLens>();
-                   }
-
                    var referenceLocations = ReferencesHandler.GetReferences(project, titleToken.Text, YarnSymbolType.Node);
                    var count = referenceLocations.Count() - 1; // This is a count of 'other' references, so don't include the declaration
 
@@ -55,7 +44,8 @@ namespace YarnLanguageServer.Handlers
                        ContractResolver = new CamelCasePropertyNamesContractResolver(),
                    };
 
-                   List<CodeLens> lenses = new() {
+                   return new CodeLens[]
+                   {
                         new CodeLens {
                            Range = PositionHelper.GetRange(yarnFile.LineStarts, titleToken),
                            Command = new Command
@@ -83,21 +73,6 @@ namespace YarnLanguageServer.Handlers
                            },
                         },
                    };
-
-                   if (nodeInfo.NodeGroupComplexity >= 0)
-                   {
-                       lenses.Add(new CodeLens
-                       {
-                           Range = PositionHelper.GetRange(yarnFile.LineStarts, titleToken),
-                           Command = new Command
-                           {
-                               Name = string.Empty,
-                               Title = $"Complexity: {nodeInfo.NodeGroupComplexity}",
-                           },
-                       });
-                   }
-
-                   return lenses;
                });
 
             CodeLensContainer result = new CodeLensContainer(results);

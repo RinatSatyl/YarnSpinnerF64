@@ -1,19 +1,11 @@
-using OmniSharp.Extensions.LanguageServer.Protocol;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 
 namespace YarnLanguageServer
 {
-    public record ProjectInfo
-    {
-        public DocumentUri? Uri { get; set; }
-        public IEnumerable<DocumentUri> Files { get; set; } = Array.Empty<DocumentUri>();
-        public bool IsImplicitProject { get; set; }
-    }
-
     internal class Project
     {
         public IEnumerable<YarnFileData> Files => yarnFiles.Values;
@@ -24,12 +16,14 @@ namespace YarnLanguageServer
         {
             get
             {
-                if (LastCompilationResult == null)
+                if (LastCompilationResult.HasValue == false)
                 {
                     return Enumerable.Empty<Yarn.Compiler.Declaration>();
                 }
 
-                return LastCompilationResult.Declarations.Where(d => d.IsVariable == true);
+                var result = LastCompilationResult.Value;
+
+                return result.Declarations.Where(d => d.IsVariable == true);
             }
         }
 
@@ -37,13 +31,13 @@ namespace YarnLanguageServer
         {
             get
             {
-                if (LastCompilationResult == null)
+                if (LastCompilationResult.HasValue == false)
                 {
                     // If we haven't compiled, then we have no diagnostics
                     return Enumerable.Empty<Yarn.Compiler.Diagnostic>();
                 }
 
-                return LastCompilationResult.Diagnostics;
+                return LastCompilationResult.Value.Diagnostics;
             }
         }
 
@@ -55,29 +49,27 @@ namespace YarnLanguageServer
 
         private JsonConfigFile? DefinitionsFile { get; set; }
 
-        public event System.Action<Yarn.Compiler.CompilationResult>? OnProjectCompiled;
+        public event System.Action? OnProjectCompiled;
 
         private readonly Yarn.Compiler.Project yarnProject;
 
-        private readonly Dictionary<DocumentUri, YarnFileData> yarnFiles = new();
+        private readonly Dictionary<DocumentUri, YarnFileData> yarnFiles = new ();
 
         internal bool MatchesUri(DocumentUri uri)
         {
-            if (uri.Equals(this.Uri))
-            {
+            if (uri.Equals(this.Uri)) {
                 // This URI is for the project itself.
                 return true;
             }
 
-            if (this.IsImplicitProject)
-            {
+            if (this.IsImplicitProject) {
                 return true;
             }
 
             return yarnProject.IsMatchingPath(uri.GetFileSystemPath());
         }
 
-        public Project(string? projectFilePath, string? workspaceRoot = null, bool isImplicit = false)
+        public Project(string? projectFilePath, bool isImplicit = false)
         {
             this.IsImplicitProject = isImplicit;
 
@@ -85,10 +77,7 @@ namespace YarnLanguageServer
             {
                 // The project path is null. The workspace may not exist on
                 // disk.
-                yarnProject = new Yarn.Compiler.Project
-                {
-                    WorkspaceRootPath = workspaceRoot,
-                };
+                yarnProject = new Yarn.Compiler.Project();
                 return;
             }
 
@@ -98,13 +87,12 @@ namespace YarnLanguageServer
                 yarnProject = new Yarn.Compiler.Project
                 {
                     Path = projectFilePath,
-                    WorkspaceRootPath = workspaceRoot,
                 };
             }
             else if (File.Exists(projectFilePath))
             {
                 // This project is being loaded from a file.
-                yarnProject = Yarn.Compiler.Project.LoadFromFile(projectFilePath, workspaceRoot);
+                yarnProject = Yarn.Compiler.Project.LoadFromFile(projectFilePath);
             }
             else
             {
@@ -114,32 +102,10 @@ namespace YarnLanguageServer
 
             this.Uri = DocumentUri.FromFileSystemPath(projectFilePath);
 
-            foreach (var definitionPath in yarnProject.DefinitionsFiles)
+            if (File.Exists(yarnProject.DefinitionsPath))
             {
-                try
-                {
-                    if (File.Exists(definitionPath))
-                    {
-                        var definitionsText = File.ReadAllText(definitionPath);
-                        var newFile = new JsonConfigFile(definitionsText, false);
-                        if (DefinitionsFile == null)
-                        {
-                            DefinitionsFile = newFile;
-                        }
-                        else
-                        {
-                            DefinitionsFile.MergeWith(newFile);
-                        }
-                    }
-                }
-                catch (Newtonsoft.Json.JsonException)
-                {
-                    // TODO: handle parse failure
-                }
-                catch (IOException)
-                {
-                    // TODO: handle read failure
-                }
+                var definitionsText = File.ReadAllText(yarnProject.DefinitionsPath);
+                DefinitionsFile = new JsonConfigFile(definitionsText, false);
             }
         }
 
@@ -154,18 +120,6 @@ namespace YarnLanguageServer
         internal IEnumerable<Yarn.Compiler.Declaration> FindVariables(string name, bool fuzzySearch = false)
         {
             return FindDeclarations(Variables, name, fuzzySearch);
-        }
-
-        internal IEnumerable<string> FindNodes(string name, bool fuzzySearch = false)
-        {
-            var nodeNames = this.yarnFiles.Values
-                .SelectMany(file => file.NodeInfos.Select(node => node.UniqueTitle))
-                .NonNull()
-                .Distinct();
-
-            var nodeGroupNames = this.yarnFiles.Values.SelectMany(file => file.NodeGroupNames).Distinct();
-
-            return FindNodeNames(nodeNames.Concat(nodeGroupNames), name, fuzzySearch);
         }
 
         /// <summary>
@@ -213,8 +167,6 @@ namespace YarnLanguageServer
 
         internal IEnumerable<NodeInfo> Nodes => yarnFiles.Values.SelectMany(file => file.NodeInfos);
 
-        internal IEnumerable<string> NodeGroupNames => yarnFiles.Values.SelectMany(file => file.NodeGroupNames);
-
         internal IEnumerable<Action> Functions => AllActions.Where(a => a.Type == ActionType.Function);
 
         internal IEnumerable<Action> Commands => AllActions.Where(a => a.Type == ActionType.Command);
@@ -229,9 +181,7 @@ namespace YarnLanguageServer
             }
         }
 
-        internal int FileVersion => yarnProject.FileVersion;
-
-        internal void ReloadProjectFromDisk(bool notifyOnComplete, CancellationToken cancellationToken)
+        internal void ReloadProjectFromDisk(bool notifyOnComplete = true)
         {
             IEnumerable<string> sourceFilePaths = this.yarnProject.SourceFiles;
 
@@ -246,12 +196,12 @@ namespace YarnLanguageServer
                 this.yarnFiles.Add(uri, fileData);
             }
 
-            CompileProject(notifyOnComplete, Yarn.Compiler.CompilationJob.Type.TypeCheck, cancellationToken);
+            CompileProject(notifyOnComplete, Yarn.Compiler.CompilationJob.Type.DeclarationsOnly);
         }
 
-        public Yarn.Compiler.CompilationResult CompileProject(bool notifyOnComplete, Yarn.Compiler.CompilationJob.Type compilationType, CancellationToken cancellationToken)
-        {
-            var functionDeclarations = Functions.Select(f => f.Declaration).NonNull();
+        public Yarn.Compiler.CompilationResult CompileProject(bool notifyOnComplete, Yarn.Compiler.CompilationJob.Type compilationType) {
+
+            var functionDeclarations = Functions.Select(f => f.Declaration);
 
             var files = this.Files.Select(f => new Yarn.Compiler.CompilationJob.File
             {
@@ -263,9 +213,7 @@ namespace YarnLanguageServer
             {
                 CompilationType = compilationType,
                 Files = files,
-                Declarations = functionDeclarations,
-                LanguageVersion = this.yarnProject.FileVersion,
-                CancellationToken = cancellationToken,
+                VariableDeclarations = functionDeclarations,
             };
 
             var compilationResult = Yarn.Compiler.Compiler.Compile(compilationJob);
@@ -274,33 +222,10 @@ namespace YarnLanguageServer
 
             if (notifyOnComplete)
             {
-                OnProjectCompiled?.Invoke(compilationResult);
+                OnProjectCompiled?.Invoke();
             }
 
             return compilationResult;
-        }
-
-        internal DebugOutput GetDebugOutput(CancellationToken cancellationToken)
-        {
-            var compilationResult = this.CompileProject(false, Yarn.Compiler.CompilationJob.Type.FullCompilation, cancellationToken);
-
-            var variables = compilationResult.Declarations
-                .Where(decl => decl.IsVariable)
-                .Select(decl => new DebugOutput.Variable
-                {
-                    Name = decl.Name,
-                    Type = decl.Type?.ToString() ?? "unknown",
-                    IsSmartVariable = decl.IsInlineExpansion,
-                    ExpressionJSON = decl.IsInlineExpansion ? new ExpressionToJSONVisitor().Visit(decl.InitialValueParserContext).JSONValue : null,
-                });
-
-            var projectDebugOutput = new DebugOutput
-            {
-                SourceProjectUri = this.Uri,
-                Variables = variables.ToList(),
-            };
-
-            return projectDebugOutput;
         }
 
         private IEnumerable<Yarn.Compiler.Declaration> FindDeclarations(IEnumerable<Yarn.Compiler.Declaration> declarations, string name, bool fuzzySearch)
@@ -311,17 +236,6 @@ namespace YarnLanguageServer
             }
 
             return Workspace.FuzzySearchItem(declarations.Select(d => (d.Name, d)), name, ConfigurationSource?.Configuration.DidYouMeanThreshold ?? Configuration.Defaults.DidYouMeanThreshold);
-        }
-
-        private IEnumerable<string> FindNodeNames(IEnumerable<string> nodeNames, string name, bool fuzzySearch)
-        {
-            if (fuzzySearch == false)
-            {
-                return nodeNames.Where(n => n.Equals(name));
-            }
-
-            return Workspace.FuzzySearchItem(nodeNames.Select(n => (n, n)), name, ConfigurationSource?.Configuration.DidYouMeanThreshold ?? Configuration.Defaults.DidYouMeanThreshold)
-                .Select(n => n);
         }
     }
 }

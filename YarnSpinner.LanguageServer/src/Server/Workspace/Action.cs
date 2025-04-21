@@ -1,7 +1,7 @@
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 #nullable enable
@@ -48,21 +48,12 @@ namespace YarnLanguageServer
         public Yarn.IType? ReturnType { get; set; }
 
         /// <summary>
-        /// Gets or sets the type that all variadic parameters (that is,
-        /// parameters that appear after the last required parameter) must be.
-        /// </summary>
-        /// <remarks>
-        /// This method is only never non-null for functions.
-        /// </remarks>
-        public Yarn.IType? VariadicParameterType { get; set; }
-
-        /// <summary>
         /// Gets a value indicating whether the implementing method is static.
         /// </summary>
         public bool IsStatic => MethodDeclarationSyntax?.Modifiers.Any(m => m.ToString() == "static") ?? true;
 
         /// <summary>
-        /// Gets the language that the action was defined in.
+        /// The language that the action was defined in.
         /// </summary>
         /// <remarks>
         /// For example, if the action is defined in a C# source file, then this property is <c>csharp</c>.
@@ -70,7 +61,7 @@ namespace YarnLanguageServer
         public string? Language { get; internal set; }
 
         /// <summary>
-        /// Gets the signature of the action, as originally defined in the source file.
+        /// The signature of the action, as originally defined in the source file.
         /// </summary>
         public string? Signature { get; internal set; }
 
@@ -113,28 +104,16 @@ namespace YarnLanguageServer
         /// If this action is not a Function, the value of this property is <see
         /// langword="null"/>.
         /// </remarks>
-        public Yarn.Compiler.Declaration? Declaration
-        {
-            get
-            {
-                if (this.Type != ActionType.Function)
-                {
-                    return null;
-                }
-
-                if (this.ReturnType == null)
-                {
-                    // No return type provided. We can't produce a valid
-                    // declaration for this function.
+        public Yarn.Compiler.Declaration? Declaration {
+            get {
+                if (this.Type != ActionType.Function) {
                     return null;
                 }
 
                 var typeBuilder = new Yarn.Compiler.FunctionTypeBuilder()
-                    .WithReturnType(this.ReturnType)
-                    .WithVariadicParameterType(this.VariadicParameterType);
+                    .WithReturnType(this.ReturnType);
 
-                foreach (var param in this.Parameters)
-                {
+                foreach (var param in this.Parameters) {
                     typeBuilder = typeBuilder.WithParameter(param.Type);
                 }
 

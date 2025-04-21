@@ -1,10 +1,11 @@
-﻿using Antlr4.Runtime;
-using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using Antlr4.Runtime;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Yarn.Compiler;
+
 // Disambiguate between
 // OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic and
 // Yarn.Compiler.Diagnostic
@@ -13,8 +14,7 @@ using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace YarnLanguageServer
 {
-    internal interface INotificationSender
-    {
+    internal interface INotificationSender {
         void SendNotification<T>(string method, T @params);
     }
 
@@ -31,8 +31,6 @@ namespace YarnLanguageServer
 
         public List<NodeInfo> NodeInfos { get; protected set; }
 
-        public List<string> NodeGroupNames { get; protected set; }
-
         public Uri Uri { get; set; }
         public INotificationSender? NotificationSender { get; protected set; }
 
@@ -47,21 +45,12 @@ namespace YarnLanguageServer
             Update(text);
         }
 
-        [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(Lexer))]
-        [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(Parser))]
-        [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(LineStarts))]
-        [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(ParseTree))]
-        [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(Tokens))]
-        [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(CommentTokens))]
-        [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(DocumentSymbols))]
-        [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(NodeInfos))]
-        [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(NodeGroupNames))]
         public void Update(string text)
         {
             LineStarts = TextCoordinateConverter.GetLineStarts(text);
 
             // Lex tokens and comments
-            var commentLexer = new YarnSpinnerLexer(CharStreams.fromString(text));
+            var commentLexer = new YarnSpinnerLexer(CharStreams.fromstring(text));
             var commentTokenStream = new CommonTokenStream(commentLexer);
             CommentTokens = new List<IToken>();
             commentTokenStream.Fill();
@@ -76,7 +65,7 @@ namespace YarnLanguageServer
                 .ToList();
 
             // Now onto the real parsing
-            Lexer = new YarnSpinnerLexer(CharStreams.fromString(text));
+            Lexer = new YarnSpinnerLexer(CharStreams.fromstring(text));
             var tokenStream = new CommonTokenStream(Lexer);
             Parser = new YarnSpinnerParser(tokenStream);
 
@@ -89,23 +78,17 @@ namespace YarnLanguageServer
 
             // should probably just set these directly inside the visit
             // function, or refactor all these into a references object
-
-            ReferencesVisitor.Visit(this, tokenStream, out var nodeInfos, out var nodeGroupNames);
-            this.NodeInfos = nodeInfos.ToList();
-            this.NodeGroupNames = nodeGroupNames.ToList();
+            NodeInfos = ReferencesVisitor.Visit(this, tokenStream).ToList();
 
             DocumentSymbols = DocumentSymbolsVisitor.Visit(this);
         }
 
         internal void ApplyContentChange(TextDocumentContentChangeEvent contentChange)
         {
-            if (contentChange.Range == null)
-            {
+            if (contentChange.Range == null) {
                 this.Text = contentChange.Text;
                 return;
-            }
-            else
-            {
+            } else {
                 var range = contentChange.Range;
 
                 var startIndex = LineStarts[range.Start.Line] + range.Start.Character;
@@ -119,6 +102,18 @@ namespace YarnLanguageServer
 
                 this.Text = stringBuilder.ToString();
             }
+        }
+
+        public int? GetRawToken(Position position)
+        {
+            // TODO: Not sure if it's even worth using a visitor vs just iterating through the token list.
+            var result = TokenPositionVisitor.Visit(this, position);
+            if (result != null) { return result; }
+
+            // The parse tree doesn't have whitespace tokens so need to manually search sometimes
+            var match = this.Tokens.FirstOrDefault(t => PositionHelper.DoesPositionContainToken(position, t));
+            result = match?.TokenIndex;
+            return result;
         }
 
         /// <summary>
@@ -137,7 +132,7 @@ namespace YarnLanguageServer
         /// Gets the collection of all tokens in this file that represent the
         /// title in a node definition.
         /// </summary>
-        public IEnumerable<IToken> NodeDefinitions => NodeInfos.Where(n => n.HasTitle).Select(n => n.TitleToken).NonNull();
+        public IEnumerable<IToken> NodeDefinitions => NodeInfos.Where(n => n.HasTitle).Select(n => n.TitleToken);
 
         /// <summary>
         /// Gets the collection of all function references in this file.
@@ -167,56 +162,33 @@ namespace YarnLanguageServer
         /// a <i>single</i> Yarn project. Multiple <see cref="YarnFileData"/>
         /// objects may exist for one file on disk.
         /// </remarks>
-        public Project? Project { get; internal set; }
+        public Project Project { get; internal set; }
 
         /// <summary>
-        /// Gets the length of the line at the specified index, optionally
+        /// Gets the length of the line at the specified index, up to but not
         /// including the line terminator.
         /// </summary>
         /// <param name="lineIndex">The zero-based index of the line to get the
         /// length of.</param>
-        /// <param name="includeLineTerminator">If <see langword="true"/>, the
-        /// resulting value will include the line terminator.</param>
         /// <returns>The length of the line.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref
         /// name="lineIndex"/> is less than zero, or equal to or greater than
         /// <see cref="LineCount"/>.</exception>
-        public int GetLineLength(int lineIndex, bool includeLineTerminator = false)
-        {
-            if (lineIndex < 0 || lineIndex >= LineCount)
-            {
+        public int GetLineLength(int lineIndex) {
+            if (lineIndex < 0 || lineIndex >= LineCount) {
                 throw new ArgumentOutOfRangeException(nameof(lineIndex), $"Must be between zero and {nameof(LineCount)}");
             }
 
+            var start = LineStarts[lineIndex];
+            var offset = 0;
 
-            if (Text.Length == 0)
-            {
+            if (Text.Length == 0) {
                 return 0;
             }
 
             var chars = Text.ToCharArray();
 
-            var start = LineStarts[lineIndex];
-            int end;
-            if ((lineIndex + 1) < LineStarts.Length)
-            {
-                end = LineStarts[lineIndex + 1];
-            }
-            else
-            {
-                end = chars.Length;
-            }
-
-            var offset = 0;
-
-
-            while ((start + offset) < end)
-            {
-                if (!includeLineTerminator && (chars[start + offset] == '\r' || chars[start + offset] == '\n'))
-                {
-                    break;
-                }
-
+            while ((start + offset) < chars.Length && chars[start + offset] != '\r' && chars[start + offset] != '\n') {
                 offset += 1;
             }
 
@@ -234,8 +206,8 @@ namespace YarnLanguageServer
         {
             Func<IToken, bool> isTokenMatch = (IToken t) => PositionHelper.DoesPositionContainToken(position, t);
 
-            var allSymbolTokens = new IEnumerable<(IToken token, YarnSymbolType type)>[] {
-                // Jumps and Detours
+            var allSymbolTokens = new IEnumerable<(IToken Token, YarnSymbolType Type)>[] {
+                // Jumps
                 NodeInfos.SelectMany(n => n.Jumps).Select(j => (j.DestinationToken, YarnSymbolType.Node)),
 
                 // Commands
@@ -248,11 +220,9 @@ namespace YarnLanguageServer
                 NodeInfos.SelectMany(n => n.FunctionCalls).Select(f => (f.NameToken, YarnSymbolType.Function)),
             };
 
-            foreach (var tokenInfo in allSymbolTokens.SelectMany(g => g))
-            {
-                if (isTokenMatch(tokenInfo.token))
-                {
-                    return (tokenInfo.type, tokenInfo.token);
+            foreach (var tokenInfo in allSymbolTokens.SelectMany(g => g)) {
+                if (isTokenMatch(tokenInfo.Token)) {
+                    return (tokenInfo.Type, tokenInfo.Token);
                 }
             }
 
@@ -261,7 +231,7 @@ namespace YarnLanguageServer
             return (YarnSymbolType.Unknown, null);
         }
 
-        public (YarnActionReference? actionReference, int? activeParameterIndex) GetParameterInfo(Position position)
+        public (YarnActionReference?, int? activeParameterIndex) GetParameterInfo(Position position)
         {
             var info = GetFunctionInfo(position);
             if (info == null)
@@ -279,8 +249,7 @@ namespace YarnLanguageServer
             int parameterIndex = 0;
             foreach (var parameter in info.Value.ParameterRanges)
             {
-                if (parameter.Contains(position))
-                {
+                if (parameter.Contains(position)) {
                     return (info, parameterIndex);
                 }
 
@@ -297,10 +266,8 @@ namespace YarnLanguageServer
         /// <param name="range">The range to check.</param>
         /// <returns><see langword="true"/> if the specified range is null,
         /// empty, or consists only of white-space characters.</returns>
-        public bool IsNullOrWhitespace(Range range)
-        {
-            if (range.IsEmpty())
-            {
+        public bool IsNullOrWhitespace(Range range) {
+            if (range.IsEmpty()) {
                 return true;
             }
 
@@ -315,40 +282,13 @@ namespace YarnLanguageServer
         /// <inheritdoc cref="IsNullOrWhitespace(Range)"/>
         /// <param name="start">The start of the range to check.</param>
         /// <param name="end">The end of the range to check.</param>
-        public bool IsNullOrWhitespace(Position start, Position end)
-        {
-            if (start > end)
-            {
+        public bool IsNullOrWhitespace(Position start, Position end) {
+            if (start > end) {
                 // Invalid range.
                 return false;
             }
 
             return IsNullOrWhitespace(new Range(start, end));
-        }
-
-        /// <summary>
-        /// Gets a substring of this file's text, indicated by the given range.
-        /// </summary>
-        /// <param name="range">The range of this file to get.</param>
-        /// <returns>A substring of this file's text.</returns>
-        public string GetRange(Range range)
-        {
-            var startOffset = PositionHelper.GetOffset(this.LineStarts, range.Start);
-            var endOffset = PositionHelper.GetOffset(this.LineStarts, range.End);
-
-            return this.Text.Substring(startOffset, endOffset - startOffset);
-        }
-
-        public int? GetRawToken(Position position)
-        {
-            // TODO: Not sure if it's even worth using a visitor vs just iterating through the token list.
-            var result = TokenPositionVisitor.Visit(this, position);
-            if (result != null) { return result; }
-
-            // The parse tree doesn't have whitespace tokens so need to manually search sometimes
-            var match = this.Tokens.FirstOrDefault(t => PositionHelper.DoesPositionContainToken(position, t));
-            result = match?.TokenIndex;
-            return result;
         }
 
         private YarnActionReference? GetFunctionInfo(Position position)

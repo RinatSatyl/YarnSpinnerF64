@@ -1,25 +1,21 @@
-using FluentAssertions;
+using Xunit;
 using System;
 using System.IO;
-using System.Linq;
-using Xunit;
-using Xunit.Abstractions;
-using Yarn.Compiler;
 using Yarn.Compiler.Upgrader;
+using Yarn.Compiler;
+using System.Linq;
+using FluentAssertions;
 
 namespace YarnSpinner.Tests
 {
 
     public class UpgraderTests : TestBase
     {
-        public UpgraderTests(ITestOutputHelper outputHelper) : base(outputHelper)
-        {
-        }
 
         // Test every file in Tests/TestCases
-        [Theory(Skip = "Language upgrader has been removed.")]
+        [Theory]
         [MemberData(nameof(DirectorySources), "Upgrader/V1toV2")]
-        public void TestUpgradingFiles(string directory)
+        public void TestUpgradingV1toV2(string directory)
         {
 
             Console.ForegroundColor = ConsoleColor.Blue;
@@ -28,13 +24,6 @@ namespace YarnSpinner.Tests
             storage.Clear();
 
             directory = Path.Combine(TestBase.TestDataPath, directory);
-
-            if (Directory.Exists(directory) == false)
-            {
-                // The directory doesn't exist. Don't try to enumerate it.
-                // TODO: skip this test instead of passing
-                return;
-            }
 
             var allInputYarnFiles = Directory.EnumerateFiles(directory)
                 .Where(path => path.EndsWith(".yarn"))
@@ -49,27 +38,24 @@ namespace YarnSpinner.Tests
 
             var upgradeJob = new UpgradeJob(
                 UpgradeType.Version1to2,
-                allInputYarnFiles.Select(path => new CompilationJob.File
-                {
-                    FileName = path,
-                    Source = File.ReadAllText(path)
+                allInputYarnFiles.Select(path => new CompilationJob.File { 
+                    FileName = path, 
+                    Source = File.ReadAllText(path) 
                 }));
-
+            
             var upgradeResult = LanguageUpgrader.Upgrade(upgradeJob);
 
             // The upgrade result should produce as many files as there are
             // expected output files
             upgradeResult.Files.Count().Should().Be(expectedOutputFiles.Count());
-
+            
             // For each file produced by the upgrade job, its content
             // should match that of the corresponding expected output
-            foreach (var outputFile in upgradeResult.Files)
-            {
+            foreach (var outputFile in upgradeResult.Files) {
                 string extension = Path.GetExtension(outputFile.Path);
                 var expectedOutputFilePath = Path.ChangeExtension(outputFile.Path, ".upgraded" + extension);
 
-                if (expectedOutputFiles.Contains(expectedOutputFilePath) == false)
-                {
+                if (expectedOutputFiles.Contains(expectedOutputFilePath) == false) {
                     // This test case doesn't expect this output (perhaps
                     // it's a test case that isn't expected to succeed.) Ignore it.
                     continue;
@@ -86,8 +72,7 @@ namespace YarnSpinner.Tests
             // expected to compile successfully, so don't do it. Instead,
             // we'll rely on the fact that the upgraded contents are what
             // we expected.
-            if (testPlanPath == null)
-            {
+            if (testPlanPath == null) {
                 // Don't compile; just succeed here.
                 return;
             }
@@ -98,10 +83,10 @@ namespace YarnSpinner.Tests
             // identical, so that's fine! Saves us having to write them to
             // a temporary location.)
 
-            var result = Compiler.Compile(CompilationJob.CreateFromFiles(expectedOutputFiles));
+            var result = Compiler.Compile(CompilationJob.CreateFromFiles(expectedOutputFiles) );
 
             result.Diagnostics.Should().BeEmpty();
-
+            
             stringTable = result.StringTable;
 
             // Execute the program and verify thats output matches the test
@@ -109,7 +94,7 @@ namespace YarnSpinner.Tests
             dialogue.SetProgram(result.Program);
 
             // Load the test plan
-            LoadTestPlan(testPlanPath);
+            LoadTestPlan(testPlanPath);            
 
             // If this file contains a Start node, run the test case
             // (otherwise, we're just testing its parsability, which we did
@@ -136,12 +121,12 @@ namespace YarnSpinner.Tests
                     Start = 17,
                     OriginalText = "replace",
                     ReplacementText = "new",
-                },
+                },     
                 new TextReplacement() {
                     Start = 29,
                     OriginalText = "",
                     ReplacementText = " add",
-                }
+                }           
             };
 
             var replacedText = LanguageUpgrader.ApplyReplacements(text, replacements);
@@ -153,13 +138,13 @@ namespace YarnSpinner.Tests
         public void TestInvalidReplacementThrows()
         {
             var text = "Keep keep";
-
+            
             var replacements = new[] {
                 new TextReplacement() {
                     Start = 5,
                     OriginalText = "delete ", // the replacement expects to see  "delete " here, but it will see "keep" instead
                     ReplacementText = ""
-                },
+                },                
             };
 
             var applyingInvalidReplacement = new Action(() =>
@@ -174,20 +159,20 @@ namespace YarnSpinner.Tests
         public void TestOutOfRangeReplacementThrows()
         {
             var text = "Test";
-
+            
             var replacements = new[] {
                 new TextReplacement() {
                     Start = 8, // This replacement starts outside the text's length
-                    OriginalText = "Test",
+                    OriginalText = "Test", 
                     ReplacementText = ""
-                },
+                },                
             };
 
             var applyingOutOfRangeReplacement = new Action(() =>
             {
                 LanguageUpgrader.ApplyReplacements(text, replacements);
             });
-
+            
             applyingOutOfRangeReplacement.Should().Throw<ArgumentOutOfRangeException>();
         }
     }

@@ -7,7 +7,6 @@ namespace YarnLanguageServer
         public static readonly string YarnSelectorPattern = "**/*.yarn";
         public static readonly string YslsJsonSelectorPattern = "**/*.ysls.json";
         public static readonly string CSharpSelectorPattern = "**/*.cs";
-        public static readonly string YarnProjectSelectorPattern = "**/*.yarnproject";
 
         /// <summary>
         /// Selector for any .yarn file in the workspace.
@@ -30,8 +29,7 @@ namespace YarnLanguageServer
             Title = "editor.action.triggerParameterHints",
         };
 
-        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(@default))]
-        public static string? OrDefault(this string str, string? @default = default)
+        public static string OrDefault(this string str, string @default = default)
         {
             return string.IsNullOrEmpty(str) ? @default : str;
         }

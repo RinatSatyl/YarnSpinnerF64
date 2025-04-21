@@ -1,37 +1,15 @@
+using System.Collections.Generic;
 using Antlr4.Runtime;
+
 using Newtonsoft.Json;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System.Collections.Generic;
 
 namespace YarnLanguageServer;
 
 public record NodeInfo
 {
-    /// <summary>
-    /// The title of the node, as stored in the program.
-    /// </summary>
-    [JsonProperty("uniqueTitle")]
-    public string? UniqueTitle { get; set; } = null;
-
-    /// <summary>
-    /// The title of the node, as defined in the source code.
-    /// </summary>
-    /// <remarks>This may be different to the node's <see cref="UniqueTitle"/>.</remarks>
-    [JsonProperty("sourceTitle")]
-    public string? SourceTitle { get; set; } = null;
-
-    /// <summary>
-    /// The subtitle of the node, if present.
-    /// </summary>
-    /// <remarks>This value is null if a subtitle header is not present.</remarks>
-    [JsonProperty("subtitle")]
-    public string? Subtitle { get; set; } = null;
-
-    [JsonProperty("nodeGroup")]
-    /// <summary>
-    /// The name of the node group the node is a member of, if any.
-    /// </summary>
-    public string? NodeGroupName { get; internal set; }
+    [JsonProperty("title")]
+    public string Title { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the line on which body content starts.
@@ -72,48 +50,42 @@ public record NodeInfo
     [JsonProperty("previewText")]
     public string PreviewText { get; set; } = string.Empty;
 
-    internal YarnFileData? File { get; init; }
+    internal YarnFileData File { get; init; }
 
-    internal IToken? TitleToken { get; set; }
+    internal IToken TitleToken { get; set; }
 
     internal List<YarnActionReference> FunctionCalls { get; init; } = new();
     internal List<YarnActionReference> CommandCalls { get; init; } = new();
     internal List<IToken> VariableReferences { get; init; } = new();
-    internal List<(string name, int lineIndex)> CharacterNames { get; init; } = new();
-
-    /// <summary>
-    /// Gets the computed complexity for this node.
-    /// </summary>
-    /// <remarks>
-    /// If this node is not part of a node group, this value is -1.
-    /// </remarks>
-    public int NodeGroupComplexity { get; internal set; } = -1;
+    internal List<(string Name, int LineIndex)> CharacterNames { get; init; } = new();
 
     /// <summary>
     /// Gets a value indicating whether this <see cref="NodeInfo"/> has a valid
     /// title.
     /// </summary>
     /// <remarks>
-    /// This value is <see langword="true"/> when <see cref="UniqueTitle"/> is not
+    /// This value is <see langword="true"/> when <see cref="Title"/> is not
     /// <see langword="null"/>, empty or whitespace, and <see
     /// cref="TitleToken"/> is not null.
     /// </remarks>
-    [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true, nameof(UniqueTitle))]
-    [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true, nameof(TitleToken))]
-    public bool HasTitle => !string.IsNullOrWhiteSpace(UniqueTitle) && TitleToken != null;
+    public bool HasTitle => !string.IsNullOrWhiteSpace(Title) && TitleToken != null;
 
-    internal Range? TitleHeaderRange
-    {
-        get
-        {
-            if (this.File == null || this.TitleToken == null)
-            {
-                return null;
-            }
-
+    internal Range TitleHeaderRange {
+        get {
             var start = TextCoordinateConverter.GetPosition(this.File.LineStarts, TitleToken.StartIndex);
-            var end = TextCoordinateConverter.GetPosition(this.File.LineStarts, TitleToken.StopIndex + 1);
+            var end = TextCoordinateConverter.GetPosition(this.File.LineStarts, TitleToken.StopIndex);
             return new Range(start, end);
         }
     }
+
+    //     position: { x: number, y: number } = { x: 0, y: 0 }
+    //     destinations: string[] = []
+    //     tags: string[] = []
+    //     line: number = 0
+    //     bodyLine: number = 0
+
+    //     start: Position = { line: 0, character: 0 };
+    //     end: Position = { line: 0, character: 0 };
+    // }
+
 }

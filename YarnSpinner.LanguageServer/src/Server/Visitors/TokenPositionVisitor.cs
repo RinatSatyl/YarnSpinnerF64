@@ -1,5 +1,6 @@
-﻿using Antlr4.Runtime.Tree;
-using System.Linq;
+﻿using System.Linq;
+using Antlr4.Runtime.Tree;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Yarn.Compiler;
 using Position = OmniSharp.Extensions.LanguageServer.Protocol.Models.Position;
 
@@ -30,8 +31,7 @@ namespace YarnLanguageServer
             foreach (var childi in Enumerable.Range(0, node.ChildCount))
             {
                 var result = Visit(node.GetChild(childi));
-                if (result.HasValue)
-                {
+                if (result.HasValue) {
                     return result;
                 }
             }

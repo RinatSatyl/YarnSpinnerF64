@@ -1,10 +1,8 @@
-using FluentAssertions;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using FluentAssertions;
 using Xunit;
-using Xunit.Abstractions;
-using Yarn.Compiler;
 
 
 namespace YarnSpinner.Tests
@@ -12,10 +10,6 @@ namespace YarnSpinner.Tests
 
     public class ProjectFileTests : TestBase
     {
-        public ProjectFileTests(ITestOutputHelper outputHelper) : base(outputHelper)
-        {
-        }
-
         private static string ProjectFilePath => Path.Combine(SpaceDemoScriptsPath, "Space.yarnproject");
         private static string ProjectFolderPath => Path.GetDirectoryName(ProjectFilePath);
 
@@ -28,7 +22,7 @@ namespace YarnSpinner.Tests
             // Then
             using (new FluentAssertions.Execution.AssertionScope())
             {
-                project.FileVersion.Should().Be(3);
+                project.FileVersion.Should().Be(2);
                 project.Path.Should().Be(ProjectFilePath);
                 project.SourceFilePatterns.Should().ContainSingle("**/*.yarn");
 
@@ -91,7 +85,7 @@ namespace YarnSpinner.Tests
 
             // Then
             loadedProject.Should().BeEquivalentTo(
-                project,
+                project, 
                 (options) => options
                     .Excluding(o => o.Path) // paths will be different
                     .Excluding(o => o.SourceFiles) // source files will be different (because paths are different)
@@ -119,30 +113,13 @@ namespace YarnSpinner.Tests
 
             // Then
             newProject.Should().BeEquivalentTo(
-                project,
+                project, 
                 (options) => options
                     .Excluding(o => o.Path) // paths will be different
                     .Excluding(o => o.SourceFiles) // source files will be different (because paths are different)
-                    .Excluding(o => o.DefinitionsFiles) // path is different
+                    .Excluding(o => o.DefinitionsPath) // path is different
             );
         }
-
-        [Fact]
-        public void TestProjectFilesCanAllowPreviewFeatures()
-        {
-            var projectSource = @"
-            {
-                ""projectFileVersion"": 2,
-                ""sourceFiles"": [""**/*.yarn""],
-                ""baseLanguage"": ""en"",
-                ""compilerOptions"": {
-                    ""allowPreviewFeatures"": true
-                }
-            }";
-
-            var project = Project.LoadFromString(projectSource, "");
-
-            project.AllowLanguagePreviewFeatures.Should().BeTrue();
-        }
     }
+
 }

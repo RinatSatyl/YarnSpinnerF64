@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "dgSpecHash": "ntrKeMBO/6A=",
+  "success": true,
+  "projectFilePath": "/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner.Compiler/YarnSpinner.Compiler.csproj",
+  "expectedPackageFiles": [
+    "/home/rin_iota/.nuget/packages/antlr4.runtime.standard/4.7.2/antlr4.runtime.standard.4.7.2.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/csvhelper/12.2.2/csvhelper.12.2.2.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/google.protobuf/3.15.0/google.protobuf.3.15.0.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/microsoft.bcl.asyncinterfaces/7.0.0/microsoft.bcl.asyncinterfaces.7.0.0.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/microsoft.csharp/4.5.0/microsoft.csharp.4.5.0.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/microsoft.extensions.filesystemglobbing/7.0.0/microsoft.extensions.filesystemglobbing.7.0.0.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/microsoft.netcore.platforms/1.1.0/microsoft.netcore.platforms.1.1.0.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/netstandard.library/2.0.3/netstandard.library.2.0.3.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/system.buffers/4.5.1/system.buffers.4.5.1.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/system.memory/4.5.5/system.memory.4.5.5.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/system.numerics.vectors/4.5.0/system.numerics.vectors.4.5.0.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/system.reflection.typeextensions/4.4.0/system.reflection.typeextensions.4.4.0.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/system.runtime.compilerservices.unsafe/6.0.0/system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/system.text.encodings.web/7.0.0/system.text.encodings.web.7.0.0.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/system.text.json/7.0.2/system.text.json.7.0.2.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/system.threading.tasks.extensions/4.5.4/system.threading.tasks.extensions.4.5.4.nupkg.sha512"
+  ],
+  "logs": [
+    {
+      "code": "NU1903",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Package 'System.Text.Json' 7.0.2 has a known high severity vulnerability, https://github.com/advisories/GHSA-hh2w-p6rv-4g7w",
+      "libraryId": "System.Text.Json",
+      "targetGraphs": [
+        ".NETStandard,Version=v2.0"
+      ]
+    }
+  ]
+}

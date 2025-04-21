@@ -5,15 +5,6 @@ namespace YarnLanguageServer;
 
 public record NodeHeader
 {
-
-    public NodeHeader(string key, string value, IToken keyToken, IToken valueToken)
-    {
-        this.Key = key;
-        this.Value = value;
-        this.KeyToken = keyToken;
-        this.ValueToken = valueToken;
-    }
-
     /// <summary>
     /// Gets the name of the header.
     /// </summary>

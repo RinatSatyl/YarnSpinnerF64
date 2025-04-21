@@ -1,26 +1,26 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using FluentAssertions;
 using OmniSharp.Extensions.JsonRpc.Testing;
 using OmniSharp.Extensions.LanguageProtocol.Testing;
 using OmniSharp.Extensions.LanguageServer.Client;
-using OmniSharp.Extensions.LanguageServer.Protocol.Client;
+using OmniSharp.Extensions.LanguageServer.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using OmniSharp.Extensions.LanguageServer.Server;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Xunit;
 using Xunit.Abstractions;
-using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
-class NotificationListeners<T> : HashSet<(TaskCompletionSource<T> Task, System.Func<T, bool> Test)>
-{
-    public TaskCompletionSource<T> AddListener(Func<T, bool>? test)
-    {
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using OmniSharp.Extensions.LanguageServer.Protocol.Client;
+
+class NotificationListeners<T> : HashSet<(TaskCompletionSource<T> Task, System.Func<T, bool> Test)> {
+    public TaskCompletionSource<T> AddListener(Func<T, bool>? test) {
         var completionSource = new TaskCompletionSource<T>();
 
-        if (test == null)
-        {
+        if (test == null) {
             // If no test is provided, use a test that always returns true.
             test = (item) => true;
         }
@@ -29,11 +29,9 @@ class NotificationListeners<T> : HashSet<(TaskCompletionSource<T> Task, System.F
         return completionSource;
     }
 
-    public void ApplyResult(T result)
-    {
+    public void ApplyResult(T result) {
         var completed = this.Where(item => item.Test(result)).ToList();
-        foreach (var item in completed)
-        {
+        foreach (var item in completed) {
             item.Task.TrySetResult(result);
         }
         this.ExceptWith(completed);
@@ -88,8 +86,7 @@ namespace YarnLanguageServer.Tests
 
         protected static void ChangeTextInDocument(ILanguageClient client, TextDocumentEdit documentEdit)
         {
-            foreach (var edit in documentEdit.Edits)
-            {
+            foreach (var edit in documentEdit.Edits) {
                 client.DidChangeTextDocument(new DidChangeTextDocumentParams
                 {
                     TextDocument = new OptionalVersionedTextDocumentIdentifier
@@ -103,31 +100,6 @@ namespace YarnLanguageServer.Tests
                         },
                     }
                 });
-            }
-        }
-
-        protected static void ChangeTextInDocuments(ILanguageClient client, WorkspaceEdit workspaceEdit)
-        {
-            if (workspaceEdit.Changes == null) { return; }
-
-            foreach ((var docUri, var textEdits) in workspaceEdit.Changes) 
-            {
-                foreach (var edit in textEdits)
-                {
-                    client.DidChangeTextDocument(new DidChangeTextDocumentParams
-                    {
-                        TextDocument = new OptionalVersionedTextDocumentIdentifier
-                        {
-                            Uri = docUri,
-                        },
-                        ContentChanges = new[] {
-                        new TextDocumentContentChangeEvent {
-                            Range = edit.Range,
-                            Text = edit.NewText,
-                        },
-                    }
-                    });
-                }
             }
         }
 
@@ -169,8 +141,7 @@ namespace YarnLanguageServer.Tests
             YarnLanguageServer.ConfigureOptions(options);
         }
 
-        protected async Task<T> GetTaskResultOrTimeoutAsync<T>(TaskCompletionSource<T> task, System.Action? onCompletion, double timeout = 2f)
-        {
+        protected async Task<T> GetTaskResultOrTimeoutAsync<T>(TaskCompletionSource<T> task, System.Action? onCompletion, double timeout = 2f) {
             try
             {
                 // Timeout.
@@ -181,7 +152,7 @@ namespace YarnLanguageServer.Tests
                         CancellationToken
                     )
                 );
-                winner.Should().BeSameAs(task.Task, "because the result should arrive within {0} seconds", timeout);
+                task.Task.Should().BeSameAs(winner, "because the result should arrive within {0} seconds", timeout);
 
                 return await task.Task;
             }
@@ -201,19 +172,18 @@ namespace YarnLanguageServer.Tests
         /// <param name="timeout">The amount of time to wait for
         /// diagnostics.</param>
         /// <returns>A collection of <see cref="Diagnostic"/> objects.</returns>
-        protected async Task<PublishDiagnosticsParams> GetDiagnosticsAsync(Func<PublishDiagnosticsParams, bool>? test = null, double timeout = 5f)
+        protected async Task<PublishDiagnosticsParams> GetDiagnosticsAsync(Func<PublishDiagnosticsParams, bool>? test = null, double timeout = 2f)
         {
             return await GetTaskResultOrTimeoutAsync(
-                ReceivedDiagnosticsNotifications.AddListener(test),
+                ReceivedDiagnosticsNotifications.AddListener(test) , 
                 null,
                 timeout
             );
         }
 
-        protected async Task<NodesChangedParams> GetNodesChangedNotificationAsync(Func<NodesChangedParams, bool>? test = null, double timeout = 5f)
-        {
+        protected async Task<NodesChangedParams> GetNodesChangedNotificationAsync(Func<NodesChangedParams, bool>? test = null, double timeout = 2f) {
             return await GetTaskResultOrTimeoutAsync(
-                NodesChangedNotification.AddListener(test),
+                NodesChangedNotification.AddListener(test), 
                 null,
                 timeout
             );

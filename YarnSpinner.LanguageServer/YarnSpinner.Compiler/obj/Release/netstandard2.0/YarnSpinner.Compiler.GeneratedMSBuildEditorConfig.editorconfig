@@ -1,0 +1,8 @@
+is_global = true
+build_property.RootNamespace = YarnSpinner.Compiler
+build_property.ProjectDir = /home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner.Compiler/
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.CsWinRTUseWindowsUIXamlProjections = false
+build_property.EffectiveAnalysisLevelStyle = 
+build_property.EnableCodeStyleSeverity = 

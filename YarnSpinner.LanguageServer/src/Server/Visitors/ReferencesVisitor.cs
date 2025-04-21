@@ -1,8 +1,8 @@
-﻿using Antlr4.Runtime;
-using Antlr4.Runtime.Misc;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Antlr4.Runtime;
+using Antlr4.Runtime.Misc;
 using Yarn.Compiler;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -10,10 +10,9 @@ namespace YarnLanguageServer
 {
     internal class ReferencesVisitor : YarnSpinnerParserBaseVisitor<bool>
     {
-        private readonly List<NodeInfo> nodeInfos = new();
-        private readonly HashSet<string> nodeGroupNames = new();
+        private readonly List<NodeInfo> nodeInfos = new ();
 
-        private NodeInfo? currentNodeInfo = null;
+        private NodeInfo currentNodeInfo = null;
 
         private YarnFileData yarnFileData;
 
@@ -23,34 +22,27 @@ namespace YarnLanguageServer
         /// </summary>
         private CommonTokenStream tokens;
 
-        public ReferencesVisitor(YarnFileData yarnFileData, CommonTokenStream tokens)
+        public static IEnumerable<NodeInfo>
+            Visit(YarnFileData yarnFileData, CommonTokenStream tokens)
         {
-            this.yarnFileData = yarnFileData;
-            this.tokens = tokens;
-        }
-
-        public static void
-            Visit(YarnFileData yarnFileData, CommonTokenStream tokens, out IEnumerable<NodeInfo> nodeInfos, out IEnumerable<string> nodeGroupNames)
-        {
-            var visitor = new ReferencesVisitor(yarnFileData, tokens);
-
+            var visitor = new ReferencesVisitor
+            {
+                yarnFileData = yarnFileData,
+                tokens = tokens,
+            };
             if (yarnFileData.ParseTree != null)
             {
                 try
                 {
                     visitor.Visit(yarnFileData.ParseTree);
-                    nodeInfos = visitor.nodeInfos;
-                    nodeGroupNames = visitor.nodeGroupNames;
-                    return;
+                    return visitor.nodeInfos;
                 }
                 catch (Exception)
                 {
                     // Don't want an exception while parsing to take out the entire language server
                 }
             }
-
-            nodeInfos = Enumerable.Empty<NodeInfo>();
-            nodeGroupNames = Enumerable.Empty<string>();
+            return Enumerable.Empty<NodeInfo>();
         }
 
         public override bool VisitNode([NotNull] YarnSpinnerParser.NodeContext context)
@@ -58,24 +50,9 @@ namespace YarnLanguageServer
             currentNodeInfo = new NodeInfo
             {
                 File = yarnFileData,
-
                 // antlr lines start at 1, but LSP lines start at 0
                 HeaderStartLine = context.Start.Line - 1,
-
-                NodeGroupComplexity = context.ComplexityScore,
             };
-
-            Utility.TryGetNodeTitle(yarnFileData.Uri.ToString(), context, out string? sourceTitle, out string? uniqueTitle, out string? subtitle, out string? nodeGroupName);
-
-            currentNodeInfo.SourceTitle = sourceTitle;
-            currentNodeInfo.UniqueTitle = uniqueTitle;
-            currentNodeInfo.Subtitle = subtitle;
-            currentNodeInfo.NodeGroupName = nodeGroupName;
-
-            if (nodeGroupName != null)
-            {
-                nodeGroupNames.Add(nodeGroupName);
-            }
 
             // Get the first few lines of the node's body as a preview
             if (context.BODY_START != null)
@@ -113,29 +90,23 @@ namespace YarnLanguageServer
 
                 // The first line after the BODY_START
                 currentNodeInfo.BodyStartLine = bodyStartLineIndex + 1;
-            }
-            else
-            {
+            } else {
                 currentNodeInfo.BodyStartLine = currentNodeInfo.HeaderStartLine;
             }
 
-            if (context.BODY_END() != null)
-            {
+            if (context.BODY_END() != null) {
                 var bodyEndLineIndex = context.BODY_END().Symbol.Line - 1;
 
                 // The line before the BODY_END
                 currentNodeInfo.BodyEndLine = bodyEndLineIndex - 1;
-            }
-            else
-            {
+            } else {
                 currentNodeInfo.BodyEndLine = currentNodeInfo.BodyStartLine;
             }
 
             // Zero-length nodes will have "the line before BODY_END" be before
             // "the line after BODY_START", which is no good. In these cases,
             // ensure that the body starts and ends on the same line.
-            if (currentNodeInfo.BodyEndLine < currentNodeInfo.BodyStartLine)
-            {
+            if (currentNodeInfo.BodyEndLine < currentNodeInfo.BodyStartLine) {
                 currentNodeInfo.BodyEndLine = currentNodeInfo.BodyStartLine;
             }
 
@@ -144,96 +115,40 @@ namespace YarnLanguageServer
 
         public override bool VisitVariable([NotNull] YarnSpinnerParser.VariableContext context)
         {
-            if (currentNodeInfo == null)
-            {
-                return base.VisitVariable(context);
-            }
-
             currentNodeInfo.VariableReferences.Add(context.Stop);
             return base.VisitVariable(context);
         }
 
-        public override bool VisitTitle_header([NotNull] YarnSpinnerParser.Title_headerContext context)
-        {
-            if (currentNodeInfo == null)
-            {
-                return base.VisitTitle_header(context);
-            }
-
-            if (context.title != null)
-            {
-                currentNodeInfo.TitleToken = context.title;
-
-                if (context.HEADER_TITLE().Payload is not IToken headerTitle)
-                {
-                    // Parse error in this token
-                    return base.VisitTitle_header(context);
-                }
-
-                currentNodeInfo.Headers.Add(new NodeHeader(
-                    key: context.HEADER_TITLE().GetText(),
-                    value: context.title.Text,
-                    keyToken: headerTitle,
-                    valueToken: context.title)
-                );
-            }
-
-            return base.VisitTitle_header(context);
-        }
-
         public override bool VisitHeader([NotNull] YarnSpinnerParser.HeaderContext context)
         {
-            if (currentNodeInfo == null)
-            {
-                return base.VisitHeader(context);
-            }
-
             if (context.header_key != null && context.header_value != null)
             {
-                currentNodeInfo.Headers.Add(new NodeHeader(
-                    key: context.header_key.Text,
-                    value: context.header_value.Text,
-                    keyToken: context.header_key,
-                    valueToken: context.header_value
-                ));
+                if (context.header_key.Text == "title")
+                {
+                    currentNodeInfo.Title = context.header_value.Text;
+                    currentNodeInfo.TitleToken = context.header_value;
+                }
+
+                currentNodeInfo.Headers.Add(new NodeHeader
+                {
+                    Key = context.header_key.Text,
+                    Value = context.header_value.Text,
+                    KeyToken = context.header_key,
+                    ValueToken = context.header_value,
+                });
             }
 
             return base.VisitHeader(context);
         }
 
-        public override bool VisitDetourToNodeName([NotNull] YarnSpinnerParser.DetourToNodeNameContext context)
-        {
-            if (currentNodeInfo == null)
-            {
-                return base.VisitDetourToNodeName(context);
-            }
-
-            if (context.destination == null)
-            {
-                // Missing destination; ignore
-                return base.VisitDetourToNodeName(context);
-            }
-
-            var jump = new NodeJump(context.destination.Text, context.destination, NodeJump.JumpType.Detour);
-            currentNodeInfo.Jumps.Add(jump);
-
-            return base.VisitDetourToNodeName(context);
-        }
-
         public override bool VisitJumpToNodeName([NotNull] YarnSpinnerParser.JumpToNodeNameContext context)
         {
-            if (currentNodeInfo == null)
+            var jump = new NodeJump
             {
-                return VisitJumpToNodeName(context);
-            }
+                DestinationTitle = context.destination.Text,
+                DestinationToken = context.destination,
+            };
 
-            if (context.destination == null)
-            {
-                // Missing destination; ignore
-                return base.VisitJumpToNodeName(context);
-            }
-
-            var jump = new NodeJump(context.destination.Text, context.destination, NodeJump.JumpType.Jump);
             currentNodeInfo.Jumps.Add(jump);
 
             return base.VisitJumpToNodeName(context);
@@ -241,11 +156,6 @@ namespace YarnLanguageServer
 
         public override bool VisitFunction_call([NotNull] YarnSpinnerParser.Function_callContext context)
         {
-            if (currentNodeInfo == null)
-            {
-                return base.VisitFunction_call(context);
-            }
-
             try
             {
                 Range parametersRange;
@@ -276,6 +186,8 @@ namespace YarnLanguageServer
 
                 parameterRanges.Add(new Range(left, parametersRange.End));
 
+
+
                 currentNodeInfo.FunctionCalls.Add(new YarnActionReference
                 {
                     NameToken = context.FUNC_ID().Symbol,
@@ -296,13 +208,8 @@ namespace YarnLanguageServer
 
         public override bool VisitDeclare_statement([NotNull] YarnSpinnerParser.Declare_statementContext context)
         {
-            if (currentNodeInfo == null)
-            {
-                return base.VisitDeclare_statement(context);
-            }
-
             var token = context.variable().VAR_ID().Symbol;
-            var documentation = GetDocumentComments(context, true)?.OrDefault($"(variable) {token.Text}");
+            var documentation = GetDocumentComments(context, true).OrDefault($"(variable) {token.Text}");
 
             currentNodeInfo.VariableReferences.Add(token);
 
@@ -311,10 +218,6 @@ namespace YarnLanguageServer
 
         public override bool VisitCommand_statement([NotNull] YarnSpinnerParser.Command_statementContext context)
         {
-            if (currentNodeInfo == null)
-            {
-                return base.VisitCommand_statement(context);
-            }
 
             // TODO: figure out how command parameters should work when the
             // parser grammar is not separating parameters itself and
@@ -326,6 +229,7 @@ namespace YarnLanguageServer
 
             // for now, register the first COMMAND_FORMATTED_TEXT as a
             // symbol and ignore the rest
+            
             var text = context.command_formatted_text().GetText();
             var components = CommandTextSplitter.SplitCommandText(text);
 
@@ -347,7 +251,7 @@ namespace YarnLanguageServer
 
             var parameterRangeStart = PositionHelper.GetRange(yarnFileData.LineStarts, commandName).End
                 .Delta(0, 1); // need at least one white space character after the command name before any parameters
-            var parameterRangeEnd = PositionHelper.GetRange(yarnFileData.LineStarts, context.COMMAND_END().Symbol).Start;
+            var parameterRangeEnd = PositionHelper.GetRange(yarnFileData.LineStarts, context.COMMAND_TEXT_END().Symbol).Start;
 
             var parameters = tokens.Skip(1);
             var parameterCount = parameters.Count();
@@ -372,7 +276,7 @@ namespace YarnLanguageServer
             {
                 NameToken = commandName,
                 Name = commandName.Text,
-                ExpressionRange = PositionHelper.GetRange(yarnFileData.LineStarts, commandName, context.COMMAND_END().Symbol),
+                ExpressionRange = PositionHelper.GetRange(yarnFileData.LineStarts, commandName, context.COMMAND_TEXT_END().Symbol),
                 ParametersRange = new Range(parameterRangeStart, parameterRangeEnd),
                 ParameterRanges = parameterRanges,
                 ParameterCount = parameterCount,
@@ -383,16 +287,12 @@ namespace YarnLanguageServer
 
             currentNodeInfo.CommandCalls.Add(result);
 
+
             return base.VisitCommand_statement(context);
         }
 
         public override bool VisitLine_statement([NotNull] YarnSpinnerParser.Line_statementContext context)
         {
-            if (currentNodeInfo == null)
-            {
-                return base.VisitLine_statement(context);
-            }
-
             var lineText = context.line_formatted_text().GetTextWithWhitespace();
 
             lineText = lineText.TrimStart();
@@ -403,8 +303,7 @@ namespace YarnLanguageServer
             // semantic tokens to fetch info from this.
             var nameMatch = SemanticTokenVisitor.NameRegex.Match(lineText);
 
-            if (nameMatch.Success)
-            {
+            if (nameMatch.Success) {
                 var nameGroup = nameMatch.Groups[1];
 
                 var startPosition = context.Start.ToPosition();
@@ -416,9 +315,9 @@ namespace YarnLanguageServer
             return base.VisitLine_statement(context);
         }
 
-        public string? GetDocumentComments(ParserRuleContext context, bool allowCommentsAfter = true)
+        public string GetDocumentComments(ParserRuleContext context, bool allowCommentsAfter = true)
         {
-            string? description = null;
+            string description = null;
 
             var precedingComments = tokens.GetHiddenTokensToLeft(context.Start.TokenIndex, YarnSpinnerLexer.COMMENTS);
 

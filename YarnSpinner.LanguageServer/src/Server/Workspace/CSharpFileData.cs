@@ -1,9 +1,9 @@
-﻿using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 #nullable enable
 
@@ -22,7 +22,7 @@ namespace YarnLanguageServer
             string[] actionAttributeNames = new string[] { "YarnCommand", "YarnFunction" };
 
             // Build the collection of method declarations that have a Yarn action attribute on them
-            Dictionary<MethodDeclarationSyntax, AttributeSyntax> taggedMethods = new();
+            Dictionary<MethodDeclarationSyntax, AttributeSyntax> taggedMethods = new ();
 
             // Get all classes that do not have the GeneratedCode attribute
             var nonGeneratedClasses = root.DescendantNodes().OfType<ClassDeclarationSyntax>().Where(classDecl =>
@@ -42,16 +42,7 @@ namespace YarnLanguageServer
                 {
                     foreach (var attribute in list.Attributes)
                     {
-                        string name;
-                        if (attribute.Name is QualifiedNameSyntax qualifiedName)
-                        {
-                            name = qualifiedName.Right.ToString();
-                        }
-                        else
-                        {
-                            name = attribute.Name.ToString();
-                        }
-
+                        var name = attribute.Name.ToString();
                         if (name.EndsWith("Attribute"))
                         {
                             name = name.Remove(name.LastIndexOf("Attribute"));
@@ -72,9 +63,7 @@ namespace YarnLanguageServer
 
                 if (actionAttribute != null)
                 {
-                    // Don't add the same method declaration multiple times
-                    // (can happen if a method declaration is a decendent of multiple classes ie. is in a nested class)
-                    taggedMethods.TryAdd(method, actionAttribute);
+                    taggedMethods.Add(method, actionAttribute);
                 }
             }
 
@@ -93,15 +82,13 @@ namespace YarnLanguageServer
                 .SelectMany(c => c.DescendantNodes())
                 .OfType<InvocationExpressionSyntax>()
                 .Where(i => i.Expression.ToString().Contains("AddCommandHandler"))
-                .Where(i => i.ArgumentList.Arguments.Count == 2)
-                .Where(i => i.ArgumentList.Arguments[0].Expression.Kind() == SyntaxKind.StringLiteralExpression);
+                .Where(i => i.ArgumentList.Arguments.Count == 2);
 
             var addFunctionInvocations = nonGeneratedClasses
                 .SelectMany(c => c.DescendantNodes())
                 .OfType<InvocationExpressionSyntax>()
                 .Where(i => i.Expression.ToString().Contains("AddFunction"))
-                .Where(i => i.ArgumentList.Arguments.Count == 2)
-                .Where(i => i.ArgumentList.Arguments[0].Expression.Kind() == SyntaxKind.StringLiteralExpression);
+                .Where(i => i.ArgumentList.Arguments.Count == 2);
 
             foreach (var invocation in addCommandInvocations)
             {
@@ -118,7 +105,6 @@ namespace YarnLanguageServer
             foreach (var invocation in addFunctionInvocations)
             {
                 Action action = GetActionFromRuntimeRegistration(invocation, ActionType.Function);
-
                 action.SourceFileUri = uri;
 
                 // Set the source range to the range of the method, if we know
@@ -195,8 +181,7 @@ namespace YarnLanguageServer
             {
                 action.Type = ActionType.Command;
 
-                if (action.IsStatic == false)
-                {
+                if (action.IsStatic == false) {
                     // Instance command methods take an initial GameObject
                     // parameter, which indicates which game object should
                     // receive the command. Add this new parameter to the start
@@ -205,7 +190,7 @@ namespace YarnLanguageServer
                     {
                         Name = "target",
                         Description = "The game object that should receive the command",
-                        Type = Yarn.Types.String,
+                        Type = Yarn.BuiltinTypes.String,
                         DisplayTypeName = "GameObject",
                         IsParamsArray = false,
                     };
@@ -235,29 +220,16 @@ namespace YarnLanguageServer
                 Signature = $"{method.Identifier.Text}{method.ParameterList}",
             };
 
-            for (int i = 0; i < method.ParameterList.Parameters.Count; i++)
+            foreach (var parameter in method.ParameterList.Parameters)
             {
-                ParameterSyntax? parameter = method.ParameterList.Parameters[i];
-
-                var isLastParameter = i == method.ParameterList.Parameters.Count - 1;
-
-                if (isLastParameter && parameter.Type is ArrayTypeSyntax arrayTypeSyntax)
+                action.Parameters.Add(new Action.ParameterInfo
                 {
-                    // If this is the last parameter and it's an array, then
-                    // this parameter is where all variadic parameters will go.
-                    action.VariadicParameterType = GetYarnType(arrayTypeSyntax.ElementType);
-                }
-                else
-                {
-                    action.Parameters.Add(new Action.ParameterInfo
-                    {
-                        Name = parameter.Identifier.ToString(),
-                        Description = GetParameterDocumentation(method, parameter.Identifier.ToString()),
-                        DisplayDefaultValue = parameter.Default?.Value?.ToString(),
-                        Type = GetYarnType(parameter.Type),
-                        DisplayTypeName = parameter.Type?.ToString() ?? "(unknown)",
-                    });
-                }
+                    Name = parameter.Identifier.ToString(),
+                    Description = GetParameterDocumentation(method, parameter.Identifier.ToString()),
+                    DisplayDefaultValue = parameter.Default?.Value?.ToString(),
+                    Type = GetYarnType(parameter.Type),
+                    DisplayTypeName = parameter.Type?.ToString() ?? "(unknown)",
+                });
             }
 
             return action;
@@ -275,25 +247,25 @@ namespace YarnLanguageServer
             // 'Any'
             if (typeSyntax == null)
             {
-                return Yarn.Types.Any;
+                return Yarn.BuiltinTypes.Any;
             }
 
             switch (typeSyntax.ToString())
             {
                 case "string":
-                    return Yarn.Types.String;
+                    return Yarn.BuiltinTypes.String;
                 case "int":
                 case "float":
                 case "double":
                 case "byte":
                 case "uint":
                 case "decimal":
-                    return Yarn.Types.Number;
+                    return Yarn.BuiltinTypes.Number;
                 case "bool":
-                    return Yarn.Types.Boolean;
+                    return Yarn.BuiltinTypes.Boolean;
                 default:
                     // We don't know the type. Mark it as 'any'.
-                    return Yarn.Types.Any;
+                    return Yarn.BuiltinTypes.Any;
             }
         }
 
@@ -370,8 +342,7 @@ namespace YarnLanguageServer
 
             documentation = summary ?? triviaStructure.ToString();
 
-            if (remarks != null)
-            {
+            if (remarks != null) {
                 documentation += "\n\n" + remarks;
             }
 
@@ -436,18 +407,13 @@ namespace YarnLanguageServer
             {
                 // Get all content from this element that isn't a newline, and
                 // join it up into a single string.
-                var nodes = triviaMatch
-                    .Content.SelectMany((c) =>
-                    {
-                        return c
-                        .DescendantNodesAndTokens()
-                        .Where(ct => ct.Kind() != SyntaxKind.XmlTextLiteralNewLineToken)
-                        .Select(ct => ct.AsToken().ValueText);
-                    });
+                var v = triviaMatch
+                    .Content[0]
+                    .ChildTokens()
+                    .Where(ct => ct.Kind() != SyntaxKind.XmlTextLiteralNewLineToken)
+                    .Select(ct => ct.ValueText.Trim());
 
-                var text = string.Join(string.Empty, nodes.Select(n => n.ToString()));
-
-                return text.Trim();
+                return string.Join(" ", v).Trim();
             }
 
             return null;

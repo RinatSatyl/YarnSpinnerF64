@@ -1,32 +1,28 @@
-using CLDRPlurals;
-using FluentAssertions;
+using Xunit;
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
+using Yarn;
 using System.IO;
 using System.Linq;
-using Xunit;
-using Xunit.Abstractions;
-using Yarn;
+
 using Yarn.Compiler;
+using CLDRPlurals;
+using System.Globalization;
+
+using FluentAssertions;
 
 namespace YarnSpinner.Tests
 {
-    public class LanguageTests : TestBase
+	public class LanguageTests : TestBase
     {
-        public LanguageTests(ITestOutputHelper outputHelper) : base(outputHelper)
-        {
+		public LanguageTests() : base() {
 
             // Register some additional functions
-            dialogue.Library.RegisterFunction("add_three_operands", delegate (int a, int b, int c)
-            {
+            dialogue.Library.RegisterFunction("add_three_operands", delegate (int a, int b, int c) {
                 return a + b + c;
             });
-
-            dialogue.Library.RegisterFunction("set_objective_complete", (string objective) => true);
-            dialogue.Library.RegisterFunction("is_objective_active", (string objective) => true);
-        }
+		}
 
         [Fact]
         public void TestExampleScript()
@@ -34,18 +30,47 @@ namespace YarnSpinner.Tests
             runtimeErrorsCauseFailures = false;
             var path = Path.Combine(TestDataPath, "Example.yarn");
             var testPath = Path.ChangeExtension(path, ".testplan");
-
+            
             var result = Compiler.Compile(CompilationJob.CreateFromFiles(path));
 
             result.Diagnostics.Should().BeEmpty();
-
+            
             dialogue.SetProgram(result.Program);
             stringTable = result.StringTable;
-
+            
             this.LoadTestPlan(testPath);
 
             RunStandardTestcase();
         }
+
+        [Fact]
+        public void TestMergingNodes()
+        {
+            var sallyPath = Path.Combine(SpaceDemoScriptsPath, "Sally.yarn");
+            var shipPath = Path.Combine(SpaceDemoScriptsPath, "Ship.yarn");
+
+            CompilationJob compilationJobSally = CompilationJob.CreateFromFiles(sallyPath);
+            CompilationJob compilationJobSallyAndShip = CompilationJob.CreateFromFiles(sallyPath, shipPath);
+            
+            compilationJobSally.Library = dialogue.Library;
+            compilationJobSallyAndShip.Library = dialogue.Library;
+            
+            var resultSally = Compiler.Compile(compilationJobSally);
+            var resultSallyAndShip = Compiler.Compile(compilationJobSallyAndShip);
+
+
+            resultSally.Diagnostics.Should().BeEmpty();
+            resultSallyAndShip.Diagnostics.Should().BeEmpty();
+
+            // Loading code with the same contents should throw
+            var combiningPrograms = delegate ()
+            {
+                var combinedNotWorking = Program.Combine(resultSally.Program, resultSallyAndShip.Program);
+            };
+            combiningPrograms.Should().Throw<InvalidOperationException>();
+        }
+
+
 
         [Fact]
         public void TestEndOfNotesWithOptionsNotAdded()
@@ -55,12 +80,11 @@ namespace YarnSpinner.Tests
             var result = Compiler.Compile(CompilationJob.CreateFromFiles(path));
 
             result.Diagnostics.Should().BeEmpty();
-
+            
             dialogue.SetProgram(result.Program);
             stringTable = result.StringTable;
 
-            dialogue.OptionsHandler = delegate (OptionSet optionSets)
-            {
+            dialogue.OptionsHandler = delegate (OptionSet optionSets) {
                 throw new InvalidOperationException("Options should not be shown to the user in this test.");
             };
 
@@ -76,10 +100,10 @@ namespace YarnSpinner.Tests
             var result = Compiler.Compile(CompilationJob.CreateFromFiles(path));
 
             result.Diagnostics.Should().BeEmpty();
-
+            
             result.Program.Nodes.Count.Should().Be(6);
 
-            foreach (var tag in new[] { "one", "two", "three" })
+            foreach (var tag in new[] {"one", "two", "three"})
             {
                 result.Program.Nodes["Tags"].Tags.Should().Contain(tag);
             }
@@ -107,7 +131,7 @@ namespace YarnSpinner.Tests
             headers.Add("LotsOfHeaders", new List<(string, string)>{
                 ("contains", "lots"),
                 ("title", "LotsOfHeaders"),
-                ("this", "node"),
+                ("this", "node"),                
                 ("of", null),
                 ("blank", null),
                 ("others", "are"),
@@ -157,10 +181,9 @@ namespace YarnSpinner.Tests
         }
 
         [Fact]
-        public void TestNumberPlurals()
-        {
+    public void TestNumberPlurals() {
 
-            (string, double, PluralCase)[] cardinalTests = new[] {
+            (string, double , PluralCase )[] cardinalTests = new[] {
 
                 // English
                 ("en", 1, PluralCase.One),
@@ -208,7 +231,7 @@ namespace YarnSpinner.Tests
 
             };
 
-            (string, int, PluralCase)[] ordinalTests = new[] {
+            (string, int , PluralCase )[] ordinalTests = new[] {
                 // English
                 ("en", 1, PluralCase.One),
                 ("en", 2, PluralCase.Two),
@@ -226,16 +249,14 @@ namespace YarnSpinner.Tests
                 ("cy", 4, PluralCase.Few),
                 ("cy", 5, PluralCase.Many),
                 ("cy", 10, PluralCase.Other),
-
+                
             };
 
-            foreach (var test in cardinalTests)
-            {
+            foreach (var test in cardinalTests) {
                 CLDRPlurals.NumberPlurals.GetCardinalPluralCase(test.Item1, test.Item2).Should().Be(test.Item3);
             }
 
-            foreach (var test in ordinalTests)
-            {
+            foreach (var test in ordinalTests) {
                 CLDRPlurals.NumberPlurals.GetOrdinalPluralCase(test.Item1, test.Item2).Should().Be(test.Item3);
             }
 
@@ -246,7 +267,7 @@ namespace YarnSpinner.Tests
         [MemberData(nameof(FileSources), "TestCases")]
         [MemberData(nameof(FileSources), "Issues")]
         public void TestCompilationShouldNotBeCultureDependent(string file)
-        {
+        { 
             var path = Path.Combine(TestDataPath, file);
 
             var source = File.ReadAllText(path);
@@ -273,26 +294,19 @@ namespace YarnSpinner.Tests
             var (invariantParseResult, _) = Utility.ParseSource(source);
 
             var invariantCompilationJob = CompilationJob.CreateFromString("input", source);
-            invariantCompilationJob.LanguageVersion = Project.CurrentProjectFileVersion;
-            invariantCompilationJob.Library = dialogue.Library;
-
             var invariantResult = Compiler.Compile(invariantCompilationJob);
 
             var invariantDiagnostics = invariantResult.Diagnostics.Select(d => d.ToString());
             var invariantProgram = invariantResult.Program;
             var invariantStringTable = invariantResult.StringTable.Values.Select(s => s.ToString());
             var invariantParseTree = FormatParseTreeAsText(invariantParseResult.Tree);
-
-            foreach (var cultureName in targetCultures)
-            {
+            
+            foreach (var cultureName in targetCultures) {
                 CultureInfo.CurrentCulture = new CultureInfo(cultureName);
 
                 var (targetParseResult, _) = Utility.ParseSource(source);
 
                 var targetCompilationJob = CompilationJob.CreateFromString("input", source);
-                invariantCompilationJob.LanguageVersion = Project.CurrentProjectFileVersion;
-                targetCompilationJob.Library = dialogue.Library;
-
                 var targetResult = Compiler.Compile(targetCompilationJob);
 
                 var targetDiagnostics = targetResult.Diagnostics.Select(d => d.ToString());
@@ -304,14 +318,14 @@ namespace YarnSpinner.Tests
                 targetDiagnostics.Should().ContainInOrder(invariantDiagnostics);
                 targetProgram.Should().Be(invariantProgram);
                 targetStringTable.Should().ContainInOrder(invariantStringTable);
-
+                
             }
 
             CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
         }
 
         // Test every file in Tests/TestCases
-        [Theory(Timeout = 1000)]
+        [Theory]
         [MemberData(nameof(FileSources), "TestCases")]
         [MemberData(nameof(FileSources), "TestCases/ParseFailures")]
         [MemberData(nameof(FileSources), "Issues")]
@@ -329,31 +343,28 @@ namespace YarnSpinner.Tests
             CompilationJob compilationJob = CompilationJob.CreateFromFiles(scriptFilePath);
             compilationJob.Library = dialogue.Library;
 
-            compilationJob.LanguageVersion = Project.CurrentProjectFileVersion;
-
             var testPlanFilePath = Path.ChangeExtension(scriptFilePath, ".testplan");
 
             bool testPlanExists = File.Exists(testPlanFilePath);
 
-            if (testPlanExists == false)
+            if (testPlanExists == false) 
             {
                 // No test plan for this file exists, which indicates that
                 // the file is not expected to compile. We'll actually make
                 // it a test failure if it _does_ compile.
 
                 var result = Compiler.Compile(compilationJob);
-                result.Diagnostics.Where(d => d.Severity == Diagnostic.DiagnosticSeverity.Error).Should().NotBeEmpty("{0} is expected to have compile errors", file);
-                result.Diagnostics.Should().AllSatisfy(d => d.Range.IsValid.Should().BeTrue($"{d} should have a valid range"), "all diagnostics should have a valid position");
+                result.Diagnostics.Should().NotBeEmpty("{0} is expected to have compile errors", file);
             }
             else
             {
                 // Compile the job, and expect it to succeed.
                 var result = Compiler.Compile(compilationJob);
 
-                result.Diagnostics.Should().BeEmpty("{0} is expected to have no diagnostics", file);
+                result.Diagnostics.Should().BeEmpty("{0} is expected to have no compile errors", file);
 
                 result.Program.Should().NotBeNull();
-
+            
                 LoadTestPlan(testPlanFilePath);
 
                 dialogue.SetProgram(result.Program);
@@ -372,369 +383,6 @@ namespace YarnSpinner.Tests
                     RunStandardTestcase();
                 }
             }
-
-        }
-
-        // Test every file in Tests/TestCases
-        [Theory(Timeout = 1000)]
-        [MemberData(nameof(ValidFileSources), "TestCases")]
-        public void TestBasicBlockExtraction(string file)
-        {
-            Console.ForegroundColor = ConsoleColor.Blue;
-
-            storage.Clear();
-
-            var scriptFilePath = Path.Combine(TestDataPath, file);
-
-            // Attempt to compile this. If there are errors, we do not expect an
-            // exception to be thrown.
-            CompilationJob compilationJob = CompilationJob.CreateFromFiles(scriptFilePath);
-            compilationJob.Library = dialogue.Library;
-
-            compilationJob.LanguageVersion = Project.CurrentProjectFileVersion;
-
-            var result = Compiler.Compile(compilationJob);
-
-            result.Diagnostics.Should().NotContain(d => d.Severity == Diagnostic.DiagnosticSeverity.Error);
-
-            result.Program.Nodes.Should().NotBeEmpty();
-
-            foreach (var (nodeName, node) in result.Program.Nodes)
-            {
-                var debugInfo = result.ProjectDebugInfo.GetNodeDebugInfo(nodeName);
-                debugInfo.Should().NotBeNull();
-                var blocks = node.GetBasicBlocks(debugInfo);
-                blocks.Should().NotBeEmpty();
-
-                foreach (var block in blocks)
-                {
-                    block.Instructions.Should().NotBeEmpty();
-                    block.Node.Should().Be(node);
-                    block.ToString().Should().NotBeNullOrWhiteSpace();
-                }
-            }
-        }
-
-        [Fact]
-        public void TestBasicBlockDetours()
-        {
-            // Given
-            var source = @"
-title: NodeA
----
-Line 1
-<<detour NodeB>>
-Line 3
-===
-title: NodeB
----
-Line 2
-===
-";
-            CompilationJob compilationJob = CompilationJob.CreateFromString("input", source);
-            compilationJob.Library = dialogue.Library;
-
-            compilationJob.LanguageVersion = Project.CurrentProjectFileVersion;
-
-            var result = Compiler.Compile(compilationJob);
-
-            result.Diagnostics.Should().NotContain(d => d.Severity == Diagnostic.DiagnosticSeverity.Error);
-
-            // When
-            var blocks = result.Program!.Nodes["NodeA"].GetBasicBlocks(result.ProjectDebugInfo.GetNodeDebugInfo("NodeA"));
-
-            // Then
-            blocks.Should().HaveCount(2);
-
-            var firstBlock = blocks.ElementAt(0);
-            var destination = firstBlock.Destinations.Should().ContainSingle().Which.Should().BeOfType<BasicBlock.NodeDestination>().Subject;
-
-            destination.NodeName.Should().Be("NodeB", "the first block detours to NodeB");
-            destination.ReturnTo.Should().NotBeNull("the first block is a detour");
-            destination.ReturnTo.NodeName.Should().Be("NodeA", "after detouring, the first block resumes in NodeA");
-        }
-
-        [Fact]
-        public void TestPreviewFeaturesUnavailable()
-        {
-            // Given
-            var node = CreateTestNode(new[] {
-                "<<enum Woo>>",
-                "<<case One>>",
-                "<<case Two>>",
-                "<<case Three>>",
-                "<<endenum>>",
-                "<<declare $smart_var = 1 + 2>>",
-                "=> Line group item 1",
-                "=> Line group item 2",
-            });
-
-
-            // When
-            var jobWithNoPreviewFeatures = CompilationJob.CreateFromString("input", node);
-            var jobWithPreviewFeatures = CompilationJob.CreateFromString("input", node);
-
-            jobWithNoPreviewFeatures.LanguageVersion = Project.YarnSpinnerProjectVersion2;
-            jobWithPreviewFeatures.LanguageVersion = Project.YarnSpinnerProjectVersion3;
-
-            var resultWithNoPreviewFeatures = Compiler.Compile(jobWithNoPreviewFeatures);
-            var resultWithPreviewFeatures = Compiler.Compile(jobWithPreviewFeatures);
-
-            // Then
-            resultWithNoPreviewFeatures.Diagnostics.Should().ContainEquivalentOf(new
-            {
-                Severity = Diagnostic.DiagnosticSeverity.Error,
-                Message = "Language feature \"enums\" is only available when preview features are enabled"
-            }, "enums are a preview feature");
-
-            resultWithNoPreviewFeatures.Diagnostics.Should().ContainEquivalentOf(new
-            {
-                Severity = Diagnostic.DiagnosticSeverity.Error,
-                Message = "Language feature \"smart variables\" is only available when preview features are enabled"
-            }, "smart variables are a preview feature");
-
-            resultWithNoPreviewFeatures.Diagnostics.Should().ContainEquivalentOf(new
-            {
-                Severity = Diagnostic.DiagnosticSeverity.Error,
-                Message = "Language feature \"line groups\" is only available when preview features are enabled"
-            }, "line groups are a preview feature");
-
-            resultWithPreviewFeatures.Diagnostics.Should().NotContain(d => d.Severity == Diagnostic.DiagnosticSeverity.Error, "preview features are allowed, so no errors are produced");
-        }
-
-        [Fact]
-        public void TestTestPlanThrowsErrorOnFailure()
-        {
-            var source = CreateTestNode(@"
-title: Start
----
-Line 1
-Line 2
--> Opt 1
-    you chose opt 1
--> Opt 2
--> Opt 3
-<<command>>
-            ");
-
-
-            void RunTest(string source, TestPlan plan)
-            {
-                var job = CompilationJob.CreateFromString("input", source, this.dialogue.Library);
-                var result = Compiler.Compile(job);
-                RunTestPlan(result, plan);
-            }
-
-            // When
-            // Create a plan that expects the first line to be "Line 2" (which
-            // it won't get)
-            var failingPlan = TestPlan.FromString(@"line: `Line 2`");
-
-            // Then
-            Action act = () => RunTest(source, failingPlan);
-            act.Should().Throw<Exception>();
-        }
-
-        [Fact]
-        public void TestWhenClauseValuesParseAsExpressions()
-        {
-            // Given
-            var source = @"title: Start
-when: $a
-some_other_header1: $a
-when: $b + func_call(42, ""wow"")
-some_other_header2: $b + func_call(42, ""wow"")
----
-===";
-
-            var diagnostics = new List<Diagnostic>();
-
-            // When
-            var parseResult = Compiler.ParseSyntaxTree("input", source, ref diagnostics);
-
-            // Then
-            diagnostics.Should().NotContain(e => e.Severity == Diagnostic.DiagnosticSeverity.Error, "the parse should contain no errors");
-
-            var dialogue = parseResult.Tree.Should().BeOfType<YarnSpinnerParser.DialogueContext>().Subject;
-
-            YarnSpinnerParser.NodeContext node = dialogue.GetChild<YarnSpinnerParser.NodeContext>(0);
-            node.Should().NotBeNull("a node is declared");
-
-            node.GetHeaders().Should().HaveCount(2, "three total non-'when', non-'title' headers are declared in the node");
-
-            var textHeader1 = node.GetHeader("some_other_header1");
-            textHeader1.Should().NotBeNull();
-            textHeader1.header_value.Should().NotBeNull();
-            textHeader1.header_value.Text.Should().Be("$a");
-
-            var textHeader2 = node.GetHeader("some_other_header2");
-            textHeader2.Should().NotBeNull();
-            textHeader2.header_value.Should().NotBeNull();
-            textHeader2.header_value.Text.Should().Be("$b + func_call(42, \"wow\")");
-
-            var whenHeaders = node.GetWhenHeaders();
-            whenHeaders.Should().HaveCount(2);
-
-            whenHeaders.Should().AllSatisfy(x =>
-            {
-                x.header_expression.Should().NotBeNull();
-                x.header_expression.expression().Should().NotBeNull();
-            }, "all 'when' headers should have an expression");
-
-            whenHeaders.ElementAt(0).header_when_expression().expression().ToStringTree(YarnSpinnerParser.ruleNames).Should().Be("(expression (value (variable $a)))", "the first expression is a simple variable declaration");
-            whenHeaders.ElementAt(1).header_when_expression().expression().ToStringTree(YarnSpinnerParser.ruleNames).Should().Be("(expression (expression (value (variable $b))) + (expression (value (function_call func_call ( (expression (value 42)) , (expression (value \"wow\")) )))))", "the second expression is a compound expression");
-        }
-
-        [Fact]
-        public void TestParsingStucturedCommands()
-        {
-            // Given
-            var validCommandText = "walk mae $var 2.3 \"string\" false true SomeArbitraryID function_call(2,\"three\") EnumA.Member .Member";
-            var invalidCommandText = "walk mae {$myVar}"; // an old-style 'plain text' command
-
-            // When
-            var parsedValidCommand = StructuredCommandParser.ParseStructuredCommand(validCommandText);
-            var parsedInvalidCommand = StructuredCommandParser.ParseStructuredCommand(invalidCommandText);
-
-            // Then
-            parsedValidCommand.context.command_id.Should().NotBeNull();
-            parsedValidCommand.context.command_id.Text.Should().Be("walk");
-            parsedValidCommand.context.structured_command_value().Should().HaveCount(10, "the command has this many parameters");
-            parsedValidCommand.diagnostics.Should().BeEmpty("a valid structured command has no errors");
-
-            parsedInvalidCommand.diagnostics.Should().NotBeEmpty("an invalid structured command has errors");
-
-            // Even if a structured command fails to parse, we may be able to
-            // extract some data from it. This helps us decide whether the parse
-            // error is something we should report (i.e. this is meant to be a
-            // structured command, so errors should be surfaced), or not (i.e.
-            // this is not meant to be a structured command, so errors should be
-            // ignored).
-            parsedInvalidCommand.context.command_id.Text.Should().Be("walk");
-        }
-
-        [Fact]
-        public void TestCompilationCanBeCancelled()
-        {
-            string GenerateExampleSource(int expressions)
-            {
-                var sb = new System.Text.StringBuilder();
-
-                sb.AppendLine("title: Start");
-                sb.AppendLine("---");
-
-                for (int i = 0; i < expressions; i++)
-                {
-                    sb.AppendLine($"<<declare $a{i} = 0>>");
-                }
-
-                sb.AppendLine("===");
-
-                return sb.ToString();
-            }
-
-            var expressionCount = 10_000;
-
-            // Given
-            var source = GenerateExampleSource(expressionCount);
-
-            // When
-
-            // Run the compilation without cancelling it
-            Stopwatch withoutCancelling = Stopwatch.StartNew();
-
-            {
-                var job = CompilationJob.CreateFromString("input", source);
-
-                var result = Compiler.Compile(job);
-
-                result.ContainsErrors.Should().BeFalse();
-                result.Declarations.Where(d => d.IsVariable).Should().HaveCount(expressionCount);
-                withoutCancelling.Stop();
-            }
-
-            Stopwatch withCancelling = Stopwatch.StartNew();
-
-            // Run the compilation and cancel it 500 milliseconds after starting
-            var cancellationSource = new System.Threading.CancellationTokenSource();
-            cancellationSource.CancelAfter(500);
-
-            var withCancellingTask = System.Threading.Tasks.Task.Run(() =>
-            {
-                var job = CompilationJob.CreateFromString("input", source);
-                job.CancellationToken = cancellationSource.Token;
-
-                var result = Compiler.Compile(job);
-
-                result.ContainsErrors.Should().BeFalse();
-                result.Declarations.Where(d => d.IsVariable).Should().HaveCount(expressionCount);
-                withCancelling.Stop();
-            });
-
-            new Action(withCancellingTask.Wait)
-                .Should().Throw<OperationCanceledException>("the compilation should be cancelled");
-
-            // Then
-            withCancelling.Elapsed.Should().BeLessThan(withoutCancelling.Elapsed,
-                "cancelling a compilation should complete sooner than letting the compilation run to completion");
-        }
-
-        [Fact]
-        public void TestNodeDebugInfoContainsInfo()
-        {
-            // Given
-            var source = @"title: NodeA
----
-Line 1
-Line 2
-<<declare $smartVar = 1+1>>
-===
-title: NodeB
----
-Line 3
-===
-title: NodeGroup
-when: always
----
-Line in a node group
-===
-";
-
-
-            // When
-            var compilationJob = CompilationJob.CreateFromString("input", source);
-            var result = Compiler.Compile(compilationJob);
-
-            // Then
-            result.ProjectDebugInfo.Nodes.Should().HaveCount(6);
-
-            var nodeAInfo = result.ProjectDebugInfo.GetNodeDebugInfo("NodeA");
-            var nodeBInfo = result.ProjectDebugInfo.GetNodeDebugInfo("NodeB");
-            var smartVarInfo = result.ProjectDebugInfo.GetNodeDebugInfo("$smartVar");
-            var nodeGroupHub = result.ProjectDebugInfo.GetNodeDebugInfo("NodeGroup");
-            var nodeGroupItem = result.ProjectDebugInfo.Nodes.FirstOrDefault(n => n.NodeName.StartsWith("NodeGroup."));
-            var nodeGroupItemCondition = result.ProjectDebugInfo.Nodes.FirstOrDefault(n => n.NodeName.Contains(".Condition."));
-
-            nodeAInfo.Should().NotBeNull();
-            nodeBInfo.Should().NotBeNull();
-            smartVarInfo.Should().NotBeNull();
-            nodeGroupHub.Should().NotBeNull();
-            nodeGroupItem.Should().NotBeNull();
-            nodeGroupItemCondition.Should().NotBeNull();
-
-            new[] { nodeAInfo, nodeBInfo, smartVarInfo }.Should().AllSatisfy(i => i.FileName.Should().Be("input"));
-            nodeAInfo.Range.Should().BeEquivalentTo<Yarn.Compiler.Range>(new(1, 0, 6, 2));
-            nodeBInfo.Range.Should().BeEquivalentTo<Yarn.Compiler.Range>(new(7, 0, 10, 2));
-            smartVarInfo.Range.Should().BeEquivalentTo<Yarn.Compiler.Range>(new(5, 22, 5, 24),
-                "the position of the smart variable 'node' is defined by the expression");
-
-            nodeAInfo.IsImplicit.Should().BeFalse();
-            nodeBInfo.IsImplicit.Should().BeFalse();
-            smartVarInfo.IsImplicit.Should().BeTrue();
-
-            nodeGroupHub.IsImplicit.Should().BeTrue("node group hubs are created by the compiler and do not appear in the input source code");
-            nodeGroupItem.IsImplicit.Should().BeFalse("nodes in a node group are present in the input source code");
-            nodeGroupItemCondition.IsImplicit.Should().BeTrue("node group condition smart variables are created by the compiler");
         }
     }
 }

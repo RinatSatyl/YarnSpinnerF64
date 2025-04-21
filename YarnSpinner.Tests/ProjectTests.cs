@@ -1,11 +1,13 @@
-using FluentAssertions;
-using System.Collections.Generic;
+using Xunit;
+using System;
 using System.IO;
+using System.Collections;
+using System.Collections.Generic;
+using Yarn;
+using Yarn.Compiler;
 using System.Linq;
 using System.Text.RegularExpressions;
-using Xunit;
-using Xunit.Abstractions;
-using Yarn.Compiler;
+using FluentAssertions;
 
 namespace YarnSpinner.Tests
 {
@@ -13,28 +15,28 @@ namespace YarnSpinner.Tests
 
     public class ProjectTests : TestBase
     {
-        public ProjectTests(ITestOutputHelper outputHelper) : base(outputHelper) { }
-
+		
         [Fact]
         public void TestLoadingNodes()
         {
             var path = Path.Combine(TestDataPath, "Projects", "Basic", "Test.yarn");
-
+            
             var result = Compiler.Compile(CompilationJob.CreateFromFiles(path));
 
             result.Diagnostics.Should().BeEmpty();
-
+            
             dialogue.SetProgram(result.Program);
             stringTable = result.StringTable;
 
             // high-level test: load the file, verify it has the nodes we want,
             // and run one
-
+            
             dialogue.NodeNames.Count().Should().Be(3);
 
             dialogue.NodeExists("TestNode").Should().BeTrue();
             dialogue.NodeExists("AnotherTestNode").Should().BeTrue();
             dialogue.NodeExists("ThirdNode").Should().BeTrue();
+            
         }
 
         [Fact]
@@ -43,7 +45,7 @@ namespace YarnSpinner.Tests
             // Parsing a file that contains variable declarations should be
             // able to turned back into a string containing the same
             // information.
-
+            
             var originalText = @"title: Program
 tags: one two
 custom: yes
@@ -65,7 +67,7 @@ custom: yes
 
             result.Diagnostics.Should().BeEmpty();
 
-            var headers = new Dictionary<string, string> {
+            var headers = new Dictionary<string,string> {
                 { "custom", "yes"}
             };
             string[] tags = new[] { "one", "two" };
@@ -108,10 +110,10 @@ custom: yes
             foreach (var path in paths)
             {
                 var content = File.ReadAllText(path);
-
+                
                 // this is the older failing version
                 // var taggedVersion = Utility.AddTagsToLines(content, existingTags);
-
+                
                 var tagged = Utility.TagLines(content, existingTags);
                 var taggedVersion = tagged.Item1;
 
@@ -123,11 +125,11 @@ custom: yes
                 existingTags = tagged.Item2 as List<string>;
             }
             // this is a bit inelegant but I don't want to write to disk
-            var taggedContent = string.Join("\n", taggedLineContent);
+            var taggedContent = string.Join("\n",taggedLineContent);
 
             compilationJob = CompilationJob.CreateFromString("tagged", taggedContent);
             result = Compiler.Compile(compilationJob);
-
+            
             // we should have no errors
             result.Diagnostics.Any(d => d.Severity == Diagnostic.DiagnosticSeverity.Error).Should().Be(false);
 
@@ -141,8 +143,7 @@ custom: yes
 
 
         [Fact]
-        public void TestLineTagsAreAdded()
-        {
+        public void TestLineTagsAreAdded() {
             // Arrange
             var originalText = @"title: Program
 ---
@@ -208,17 +209,6 @@ before 🧑🏾‍❤️‍💋‍🧑🏻after #line:abc130 // with a comment
 <<if $a == 5>>
 <<generic command goes here>>
 <<endif>>
-
-// Lines with an escaped hashtag
-This is a line with an embedded \#hashtag in it.
-This is a line with an embedded \#hashtag in it. #line:expected_326d
-
-This is a line with embedded escapable symbols in it: \[ \] \\ \< \> \{ \} \# \/
-This is a line with embedded escapable symbols in it: \[ \] \\ \< \> \{ \} \# \/ #line:expected_bc59
-
-// Lines with a shadow tag (should never have a line tag added)
-A single line, with a line tag. #shadow:expected_abc123
-
 ===";
 
             {
@@ -233,14 +223,14 @@ A single line, with a line tag. #shadow:expected_abc123
 
             // Act
 
-            var (output, newTags) = Utility.TagLines(originalText, []);
+            var output = Utility.AddTagsToLines(originalText);
 
             var compilationJob = CompilationJob.CreateFromString("input", output);
             compilationJob.CompilationType = CompilationJob.Type.StringsOnly;
 
             var compilationResult = Compiler.Compile(compilationJob);
 
-            compilationResult.Diagnostics.Should().BeEmpty("adding line tags should not introduce compile errors");
+            compilationResult.Diagnostics.Should().BeEmpty();
 
             // Assert
             var lineTagRegex = new Regex(@"#line:\w+");
@@ -248,8 +238,8 @@ A single line, with a line tag. #shadow:expected_abc123
             var lineTagAfterComment = new Regex(@"\/\/.*#line:\w+");
 
             // Ensure that the right number of tags in total is present
-            var expectedExistingTags = 19;
-            var expectedNewTags = 19;
+            var expectedExistingTags = 17;
+            var expectedNewTags = 17;
             var expectedTotalTags = expectedExistingTags + expectedNewTags;
 
             var lineTagRegexMatches = lineTagRegex.Matches(output).Count;
@@ -266,7 +256,7 @@ A single line, with a line tag. #shadow:expected_abc123
                 ("line:expected_abc123", "A single line, with a line tag."),
                 ("line:expected_def456", "An option, with a line tag."),
                 ("line:expected_ghi789", "A line with a tag, and a comment."),
-
+                
                 (null, "A line with a conditional and no line tag."),
                 (null, "A line with a conditional, a comment, and no line tag."),
 
@@ -312,23 +302,8 @@ A single line, with a line tag. #shadow:expected_abc123
                 (null, "🧑🏾‍❤️‍💋‍🧑🏻🧑🏾‍❤️‍💋‍🧑🏻"),
                 ("line:abc131", "🧑🏾‍❤️‍💋‍🧑🏻🧑🏾‍❤️‍💋‍🧑🏻"),
                 ("line:abc132", "🧑🏾‍❤️‍💋‍🧑🏻🧑🏾‍❤️‍💋‍🧑🏻"),
-
-                // Lines with an escaped hashtag
-                (null, "This is a line with an embedded #hashtag in it."),
-                ("line:expected_326d", "This is a line with an embedded #hashtag in it."),
-
-                // Lines with other escaped characters
-                // - Square bracket characters are left escaped in the output
-                //   because this is necessary for the markup system.
-                (null, @"This is a line with embedded escapable symbols in it: \[ \] \ < > { } # /"),
-                ("line:expected_bc59", @"This is a line with embedded escapable symbols in it: \[ \] \ < > { } # /"),
-
-                // The shadow line should not receive a line ID, so we don't
-                // include an entry for it.
-                // (null, "A single line, with a line tag."),
             };
-            expectedResults.Sort((a, b) =>
-            {
+            expectedResults.Sort((a,b) => {
                 if (a.tag == null)
                 {
                     if (b.tag == null)
@@ -346,7 +321,7 @@ A single line, with a line tag. #shadow:expected_abc123
                 }
                 return a.tag.CompareTo(b.tag);
             });
-
+            
             lineTagRegexMatches.Should().Be(expectedResults.Count);
 
             // used to keep track of all line ids we have already seen
@@ -380,9 +355,9 @@ A single line, with a line tag. #shadow:expected_abc123
                 }
             }
 
-            // we now should have seen every line ID, plus the entry for the shadow line
-            compilationResult.StringTable.Count.Should().Be(expectedResults.Count + 1);
-            compilationResult.StringTable.Count.Should().Be(visitedIDs.Count + 1);
+            // we now should have seen every line ID
+            compilationResult.StringTable.Count.Should().Be(expectedResults.Count);
+            compilationResult.StringTable.Count.Should().Be(visitedIDs.Count);
         }
 
         [Fact]
@@ -396,18 +371,17 @@ A single line, with a line tag. #shadow:expected_abc123
 
             // We should have a single DebugInfo object, because we compiled a
             // single node
-
-            compilationResult.ProjectDebugInfo.Should().NotBeNull();
-            compilationResult.ProjectDebugInfo.Nodes.Should().ContainSingle(n => n.NodeName == "DebugTesting");
+            compilationResult.DebugInfo.Should().NotBeNull();
+            compilationResult.DebugInfo.Should().ContainSingle();
 
             // The first instruction of the only node should begin on the third
             // line
-            var firstLineInfo = compilationResult.ProjectDebugInfo.Nodes.First().GetLineInfo(0);
+            var firstLineInfo = compilationResult.DebugInfo.First().Value.GetLineInfo(0);
 
             firstLineInfo.FileName.Should().Be("input");
             firstLineInfo.NodeName.Should().Be("DebugTesting");
-            firstLineInfo.Position.Line.Should().Be(2);
-            firstLineInfo.Position.Character.Should().Be(0);
+            firstLineInfo.LineNumber.Should().Be(2);
+            firstLineInfo.CharacterNumber.Should().Be(0);
         }
     }
 }

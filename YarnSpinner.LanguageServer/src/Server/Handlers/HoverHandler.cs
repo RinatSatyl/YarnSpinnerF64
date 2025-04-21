@@ -1,11 +1,11 @@
-﻿using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
-using OmniSharp.Extensions.LanguageServer.Protocol.Document;
-using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
+using OmniSharp.Extensions.LanguageServer.Protocol.Document;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
 namespace YarnLanguageServer.Handlers
 {
@@ -31,8 +31,7 @@ namespace YarnLanguageServer.Handlers
 
             (var tokenType, var token) = yarnFile.GetTokenAndType(request.Position);
 
-            if (token == null)
-            {
+            if (token == null) {
                 // No idea what this token is.
                 return Task.FromResult<Hover?>(null);
             }
@@ -49,13 +48,12 @@ namespace YarnLanguageServer.Handlers
                         var content = new List<MarkedString>();
                         content.Add(new MarkedString("text", definition.YarnName));
 
-                        if (definition.Signature != null)
-                        {
+                        if (definition.Signature != null) {
+
                             content.Add(new MarkedString(definition.Language, definition.Signature));
                         }
-
-                        if (definition.Documentation != null)
-                        {
+                        
+                        if (definition.Documentation != null) {
                             content.Add(new MarkedString("text", definition.Documentation ?? string.Empty));
                         }
 

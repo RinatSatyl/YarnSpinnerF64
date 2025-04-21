@@ -1,10 +1,10 @@
-﻿using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
-using OmniSharp.Extensions.LanguageServer.Protocol.Document;
-using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
+using OmniSharp.Extensions.LanguageServer.Protocol.Document;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
 namespace YarnLanguageServer.Handlers
 {
@@ -40,7 +40,7 @@ namespace YarnLanguageServer.Handlers
                         string functionSeparator = fi.Type == ActionType.Command ? " " : ", ";
 
                         string signature = string.Join(
-                            functionSeparator, fi.Parameters.Select(p =>
+                            functionSeparator, fi.Parameters.Select(p => 
                                 $"{(p.DisplayDefaultValue.Any() ? "[" : string.Empty)}{p.DisplayTypeName}:{p.Name}{(p.DisplayDefaultValue.Any() ? "]" : string.Empty)}"
                             )
                         );
@@ -73,8 +73,7 @@ namespace YarnLanguageServer.Handlers
                         };
                 }
 
-                return Task.FromResult<SignatureHelp?>(new SignatureHelp
-                {
+                return Task.FromResult<SignatureHelp?>(new SignatureHelp {
                     Signatures = new Container<SignatureInformation>(results),
                 });
             }

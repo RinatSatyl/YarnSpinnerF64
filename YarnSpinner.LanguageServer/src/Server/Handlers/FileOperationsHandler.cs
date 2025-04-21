@@ -1,10 +1,14 @@
-﻿using MediatR;
-using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
-using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Antlr4.Runtime;
+using MediatR;
+using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
+using OmniSharp.Extensions.LanguageServer.Protocol.Document;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 
 namespace YarnLanguageServer.Handlers
 {
@@ -28,8 +32,7 @@ namespace YarnLanguageServer.Handlers
 
             // Any change to a Yarn project requires that we rebuild the entire
             // workspace
-            if (yarnProjectChanges.Any())
-            {
+            if (yarnProjectChanges.Any()) {
                 needsWorkspaceReload = true;
             }
 
@@ -78,7 +81,7 @@ namespace YarnLanguageServer.Handlers
 
             if (needsWorkspaceReload)
             {
-                workspace.ReloadWorkspace(cancellationToken);
+                workspace.ReloadWorkspace();
             }
 
             return Unit.Task;
@@ -103,11 +106,6 @@ namespace YarnLanguageServer.Handlers
                                {
                                    Kind = WatchKind.Create | WatchKind.Change | WatchKind.Delete,
                                    GlobPattern = Utils.YslsJsonSelectorPattern,
-                               },
-                               new FileSystemWatcher()
-                               {
-                                   Kind = WatchKind.Create | WatchKind.Change | WatchKind.Delete,
-                                   GlobPattern = Utils.YarnProjectSelectorPattern,
                                }
                            ),
             };

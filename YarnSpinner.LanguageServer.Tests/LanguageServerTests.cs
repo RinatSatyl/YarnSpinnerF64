@@ -1,12 +1,13 @@
+using System.Threading.Tasks;
 using FluentAssertions;
-using FluentAssertions.Execution;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
+using System.Linq;
+
+using System.IO;
+using FluentAssertions.Execution;
 
 #pragma warning disable CS0162
 
@@ -20,7 +21,7 @@ namespace YarnLanguageServer.Tests
         {
         }
 
-        [Fact(Timeout = 2000)]
+        [Fact]
         public async Task Server_CanConnect()
         {
             var (client, server) = await Initialize(ConfigureClient, ConfigureServer);
@@ -29,7 +30,7 @@ namespace YarnLanguageServer.Tests
             client.ClientSettings.Should().NotBeNull();
         }
 
-        [Fact(Timeout = 2000)]
+        [Fact]
         public async Task Server_OnEnteringACommand_ShouldReceiveCompletions()
         {
             // Set up the server
@@ -71,7 +72,7 @@ namespace YarnLanguageServer.Tests
             }
         }
 
-        [Fact(Timeout = 2000)]
+        [Fact]
         public async Task Server_OnOpeningDocument_SendsNodesChangedNotification()
         {
             Task<NodesChangedParams> getInitialNodesChanged = GetNodesChangedNotificationAsync(
@@ -85,28 +86,28 @@ namespace YarnLanguageServer.Tests
             nodeInfo.Should().NotBeNull("because this notification always carries a parameters object");
             nodeInfo.Nodes.Should().NotBeNullOrEmpty("because this notification always contains a list of node infos, even if it's empty");
 
-            nodeInfo.Nodes.Should().Contain(ni => ni.UniqueTitle == "Start", "because this file contains a node with this title");
+            nodeInfo.Nodes.Should().Contain(ni => ni.Title == "Start", "because this file contains a node with this title");
 
             nodeInfo.Nodes.Should()
                 .Contain(
-                    ni => ni.UniqueTitle == "Node2",
+                    ni => ni.Title == "Node2", 
                     "because this file contains a node with this title")
                 .Which.Headers.Should()
                 .Contain(
-                    h => h.Key == "tags" && h.Value == "wow incredible",
+                    h => h.Key == "tags" && h.Value == "wow incredible", 
                     "because this node contains a tags header"
                 );
         }
 
-        [Fact(Timeout = 2000)]
+        [Fact]
         public async Task Server_OnChangingDocument_SendsNodesChangedNotification()
         {
-            var getInitialNodesChanged = GetNodesChangedNotificationAsync((nodesResult) =>
+            var getInitialNodesChanged = GetNodesChangedNotificationAsync((nodesResult) => 
                 nodesResult.Uri.AbsolutePath.Contains(Path.Combine("Project1", "Test.yarn"))
             );
 
             var (client, server) = await Initialize(ConfigureClient, ConfigureServer);
-
+            
             var filePath = Path.Combine(TestUtility.PathToTestWorkspace, "Project1", "Test.yarn");
 
             NodesChangedParams? nodeInfo;
@@ -116,7 +117,7 @@ namespace YarnLanguageServer.Tests
 
             nodeInfo.Uri.ToString().Should().Be("file://" + filePath, "because this is the URI of the file we opened");
 
-            nodeInfo.Nodes.Should().HaveCount(5, "because there are four nodes in the file before we make changes");
+            nodeInfo.Nodes.Should().HaveCount(3, "because there are three nodes in the file before we make changes");
 
             var nodesChanged = GetNodesChangedNotificationAsync((nodesResult) =>
                 nodesResult.Uri.AbsolutePath.Contains(filePath)
@@ -124,11 +125,11 @@ namespace YarnLanguageServer.Tests
             ChangeTextInDocument(client, filePath, new Position(20, 0), "title: Node3\n---\n===\n");
             nodeInfo = await nodesChanged;
 
-            nodeInfo.Nodes.Should().HaveCount(6, "because we added a new node");
-            nodeInfo.Nodes.Should().Contain(n => n.UniqueTitle == "Node3", "because the new node we added has this title");
+            nodeInfo.Nodes.Should().HaveCount(4, "because we added a new node");
+            nodeInfo.Nodes.Should().Contain(n => n.Title == "Node3", "because the new node we added has this title");
         }
 
-        [Fact(Timeout = 2000)]
+        [Fact]
         public async Task Server_OnInvalidChanges_ProducesSyntaxErrors()
         {
             var filePath = Path.Combine(TestUtility.PathToTestWorkspace, "Project1", "Test.yarn");
@@ -152,7 +153,7 @@ namespace YarnLanguageServer.Tests
                 var diagnosticsResult = await getDiagnosticsTask;
 
                 var enumerable = diagnosticsResult.Diagnostics;
-
+                
                 var errors = enumerable.Where(d => d.Severity == DiagnosticSeverity.Error);
 
                 errors.Should().NotBeNullOrEmpty("because we have introduced a syntax error");
@@ -171,7 +172,7 @@ namespace YarnLanguageServer.Tests
             }
         }
 
-        [Fact(Timeout = 2000)]
+        [Fact]
         public async Task Server_OnJumpCommand_ShouldReceiveNodeNameCompletions()
         {
             // Set up the server
@@ -223,58 +224,5 @@ namespace YarnLanguageServer.Tests
                     "because while 'Node2' is a node we could jump to, we're currently in a syntax error");
             }
         }
-
-        [Fact(Timeout = 2000)]
-        public void Workspace_BuiltInFunctions_MatchesDefaultLibrary()
-        {
-            // Given
-            var builtInActionDecls = Workspace.GetPredefinedActions().Where(a => a.Type == ActionType.Function).Select(f => f.Declaration).ToDictionary(d => d.Name);
-
-            var storage = new Yarn.MemoryVariableStore();
-            var dialogue = new Yarn.Dialogue(storage);
-            var library = dialogue.Library;
-
-            var libraryDecls = Yarn.Compiler.Compiler.GetDeclarationsFromLibrary(library).Item1.ToDictionary(d => d.Name);
-
-            // Then
-
-            // All entries in the predefined actions must map to an entry in the library
-            using (new AssertionScope())
-            {
-                foreach (var actionDecl in builtInActionDecls.Values)
-                {
-
-                    actionDecl.Should().NotBeNull();
-
-                    libraryDecls.Should().ContainKey(actionDecl!.Name);
-
-                    var libraryDecl = libraryDecls[actionDecl.Name];
-
-                    actionDecl.Should().BeEquivalentTo(libraryDecl, (config) =>
-                    {
-                        return config.Excluding(info => info.Description);
-                    });
-                }
-            }
-
-            // All entries in the library except operators must map to an entry
-            // in the predefined actions
-            using (new AssertionScope())
-            {
-                foreach (var libraryDecl in libraryDecls.Values)
-                {
-
-                    builtInActionDecls.Should().ContainKey(libraryDecl.Name);
-
-                    var actionDecl = builtInActionDecls[libraryDecl.Name];
-
-                    libraryDecl.Should().BeEquivalentTo(actionDecl, (config) =>
-                    {
-                        return config.Excluding(info => info.Description);
-                    });
-                }
-            }
-        }
     }
-
 }

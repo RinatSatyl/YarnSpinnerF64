@@ -1,24 +1,19 @@
-using FluentAssertions;
 using Xunit;
-using Xunit.Abstractions;
 using Yarn.Compiler;
+using FluentAssertions;
 
 namespace YarnSpinner.Tests
 {
     public class TagTests : TestBase
     {
-        public TagTests(ITestOutputHelper outputHelper) : base(outputHelper)
+        public TagTests() : base()
         {
         }
 
         [Fact]
-        public void TestNoOptionsLineNotTagged()
+        void TestNoOptionsLineNotTagged()
         {
-            var source = @"title:Start
----
-line without options #line:1
-===
-";
+            var source = "title:Start\n---\nline without options #line:1\n===\n";
 
             var result = Compiler.Compile(CompilationJob.CreateFromString("input", source));
             result.Diagnostics.Should().BeEmpty();
@@ -29,15 +24,9 @@ line without options #line:1
         }
 
         [Fact]
-        public void TestLineBeforeOptionsTaggedLastLine()
+        void TestLineBeforeOptionsTaggedLastLine()
         {
-            var source = @"title:Start
----
-line before options #line:1
--> option 1
--> option 2
-===
-";
+            var source = "title:Start\n---\nline before options #line:1\n-> option 1\n-> option 2\n===\n";
 
             var result = Compiler.Compile(CompilationJob.CreateFromString("input", source));
             result.Diagnostics.Should().BeEmpty();
@@ -48,16 +37,9 @@ line before options #line:1
         }
 
         [Fact]
-        public void TestLineNotBeforeOptionsNotTaggedLastLine()
+        void TestLineNotBeforeOptionsNotTaggedLastLine()
         {
-            var source = @"title:Start
----
-line not before options #line:0
-line before options #line:1
--> option 1
--> option 2
-===
-";
+            var source = "title:Start\n---\nline not before options #line:0\nline before options #line:1\n-> option 1\n-> option 2\n===\n";
 
             var result = Compiler.Compile(CompilationJob.CreateFromString("input", source));
             result.Diagnostics.Should().BeEmpty();
@@ -68,16 +50,9 @@ line before options #line:1
         }
 
         [Fact]
-        public void TestLineAfterOptionsNotTaggedLastLine()
+        void TestLineAfterOptionsNotTaggedLastLine()
         {
-            var source = @"title:Start
----
-line before options #line:1
--> option 1
--> option 2
-line after options #line:2
-===
-";
+            var source = "title:Start\n---\nline before options #line:1\n-> option 1\n-> option 2\nline after options #line:2\n===\n";
 
             var result = Compiler.Compile(CompilationJob.CreateFromString("input", source));
             result.Diagnostics.Should().BeEmpty();
@@ -88,7 +63,7 @@ line after options #line:2
         }
 
         [Fact]
-        public void TestNestedOptionLinesTaggedLastLine()
+        void TestNestedOptionLinesTaggedLastLine()
         {
             var source = CreateTestNode(@"
 line before options #line:1
@@ -111,7 +86,7 @@ line before options #line:1
         }
 
         [Fact]
-        public void TestIfInteriorLinesTaggedLastLine()
+        void TestIfInteriorLinesTaggedLastLine()
         {
             var source = CreateTestNode(@"
 <<if true>>
@@ -127,7 +102,7 @@ line before options #line:0
             info.metadata.Should().Contain("lastline");
         }
         [Fact]
-        public void TestIfInteriorLinesNotTaggedLastLine()
+        void TestIfInteriorLinesNotTaggedLastLine()
         {
             var source = CreateTestNode(@"
 <<if true>>
@@ -144,7 +119,7 @@ line before options #line:0
         }
 
         [Fact]
-        public void TestNestedOptionLinesNotTagged()
+        void TestNestedOptionLinesNotTagged()
         {
             var source = CreateTestNode(@"
 -> option 1
@@ -161,7 +136,7 @@ line before options #line:0
         }
 
         [Fact]
-        public void TestInterruptedLinesNotTagged()
+        void TestInterruptedLinesNotTagged()
         {
             var source = CreateTestNode(@"
 line before command #line:0
@@ -176,7 +151,7 @@ line before set #line:2
 line before jump #line:3
 <<jump nodename>>
 line before call #line:4
-<<call string(5)>>
+<<call function()>>
             ");
 
             var result = Compiler.Compile(CompilationJob.CreateFromString("input", source));
@@ -195,17 +170,9 @@ line before call #line:4
         }
 
         [Fact]
-        public void TestLineIsLastBeforeAnotherNodeNotTagged()
+        void TestLineIsLastBeforeAnotherNodeNotTagged()
         {
-            var source = @"title: Start
----
-last line #line:0
-===
-title: Second
----
--> option 1
-===
-";
+            var source = "title: Start\n---\nlast line #line:0\n===\ntitle: Second\n---\n-> option 1\n===\n";
             var result = Compiler.Compile(CompilationJob.CreateFromString("input", source));
             result.Diagnostics.Should().BeEmpty();
 
@@ -235,34 +202,6 @@ title: Second
             job.CompilationType = CompilationJob.Type.StringsOnly;
             results = Compiler.Compile(job);
             results.Diagnostics.Should().BeEmpty();
-        }
-
-        [Fact]
-        public void TestShadowLinesReflectSourceLines()
-        {
-            var source =
-@"title: Start
----
-This is a line. #line:source #apple
-This is a line. #shadow:source #banana
-===
-";
-            var result = Compiler.Compile(CompilationJob.CreateFromString("input", source));
-
-            result.StringTable.Should().HaveCount(2, "there are two lines in the string table");
-
-            var sourceLine = result.StringTable.Should().ContainSingle(kv => kv.Key == "line:source").Subject.Value;
-            var shadowLine = result.StringTable.Should().ContainSingle(kv => kv.Key != "line:source").Subject.Value;
-
-            sourceLine.text.Should().Be("This is a line.");
-            sourceLine.shadowLineID.Should().BeNull("source lines do not have a shadow line ID");
-            sourceLine.metadata.Should().Contain("apple");
-            sourceLine.metadata.Should().NotContain("banana");
-
-            shadowLine.text.Should().BeNull("shadow lines do not contain any source text");
-            shadowLine.shadowLineID.Should().Be("line:source");
-            shadowLine.metadata.Should().NotContain("apple", "shadow lines have their own metadata");
-            shadowLine.metadata.Should().Contain("banana", "shadow lines have their own metadata");
         }
     }
 }

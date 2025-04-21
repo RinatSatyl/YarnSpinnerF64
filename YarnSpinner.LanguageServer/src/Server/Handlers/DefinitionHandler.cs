@@ -1,10 +1,10 @@
-﻿using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
-using OmniSharp.Extensions.LanguageServer.Protocol.Document;
-using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
+using OmniSharp.Extensions.LanguageServer.Protocol.Document;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
 namespace YarnLanguageServer.Handlers
 {
@@ -32,8 +32,7 @@ namespace YarnLanguageServer.Handlers
 
             IEnumerable<Action> functionDefinitionMatches;
 
-            if (token == null)
-            {
+            if (token == null) {
                 return Task.FromResult(new LocationOrLocationLinks());
             }
 
@@ -43,7 +42,7 @@ namespace YarnLanguageServer.Handlers
                     functionDefinitionMatches = project.FindActions(token.Text, ActionType.Command, fuzzySearch: false);
 
                     var locations = functionDefinitionMatches
-                        .Where(definition => definition.SourceFileUri != null
+                        .Where(definition => definition.SourceFileUri != null 
                             && definition.SourceRange != null)
                         .Select(definition =>
                         new LocationOrLocationLink(new Location
@@ -89,28 +88,17 @@ namespace YarnLanguageServer.Handlers
 
                 case YarnSymbolType.Node:
                     var nDefinitionMatches = project.Nodes
-                        .Where(nt => nt.UniqueTitle == token.Text);
+                        .Where(nt => nt.Title == token.Text);
 
-                    locations = nDefinitionMatches
-
-                    .Select(definition =>
-                    {
-                        if (definition.File == null || definition.TitleHeaderRange == null)
-                        {
-                            return null;
-                        }
-                        else
-                        {
-                            return new LocationOrLocationLink(
-                                new Location
-                                {
-                                    Uri = definition.File.Uri,
-                                    Range = definition.TitleHeaderRange,
-                                }
-                            );
-                        }
-                    }).NonNull();
-
+                    locations = nDefinitionMatches.Select(definition =>
+                        new LocationOrLocationLink(
+                            new Location
+                            {
+                                Uri = definition.File.Uri,
+                                Range = definition.TitleHeaderRange,
+                            }
+                        )
+                    );
                     return Task.FromResult(new LocationOrLocationLinks(locations));
             }
 

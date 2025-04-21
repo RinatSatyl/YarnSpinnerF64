@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "dgSpecHash": "3Qz+g8EWk/c=",
+  "success": true,
+  "projectFilePath": "/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/YarnSpinner.csproj",
+  "expectedPackageFiles": [
+    "/home/rin_iota/.nuget/packages/google.protobuf/3.15.0/google.protobuf.3.15.0.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/microsoft.netcore.platforms/1.1.0/microsoft.netcore.platforms.1.1.0.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/netstandard.library/2.0.3/netstandard.library.2.0.3.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/system.buffers/4.4.0/system.buffers.4.4.0.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/system.memory/4.5.3/system.memory.4.5.3.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/system.numerics.vectors/4.4.0/system.numerics.vectors.4.4.0.nupkg.sha512",
+    "/home/rin_iota/.nuget/packages/system.runtime.compilerservices.unsafe/4.5.2/system.runtime.compilerservices.unsafe.4.5.2.nupkg.sha512"
+  ],
+  "logs": []
+}

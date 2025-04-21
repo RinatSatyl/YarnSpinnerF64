@@ -8,7 +8,7 @@
       "Parameters": [
         {
           "Name": "SecondsToWait",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "You can use integers (whole numbers), or decimals.",
           "IsParamsArray": false
         }
@@ -31,12 +31,11 @@
       "Parameters": [
         {
           "Name": "value",
-          "Type": "any",
+          "Type": "Any",
           "Documentation": "",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "string"
+      ]
     },
     {
       "YarnName": "number",
@@ -46,12 +45,11 @@
       "Parameters": [
         {
           "Name": "value",
-          "Type": "any",
+          "Type": "Any",
           "Documentation": "",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "number"
+      ]
     },
     {
       "YarnName": "format_invariant",
@@ -61,38 +59,36 @@
       "Parameters": [
         {
           "Name": "value",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "string"
+      ]
     },
     {
       "YarnName": "bool",
       "DefinitionName": "bool",
-      "Documentation": "Converts a value to bool type.",
+      "Documentation": "Converts value to boolean type.",
       "Signature": "bool(value)",
       "Parameters": [
         {
           "Name": "value",
-          "Type": "any",
+          "Type": "Any",
           "Documentation": "",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "bool"
+      ]
     },
     {
       "YarnName": "visited",
       "DefinitionName": "visited",
-      "Documentation": "Returns a bool value of true if the node with the title of node_name has been entered and exited at least once before, otherwise returns false. Will return false if node_name doesn't match a node in project.",
+      "Documentation": "Returns a boolean value of true if the node with the title of node_name has been entered and exited at least once before, otherwise returns false. Will return false if node_name doesn't match a node in project.",
       "Signature": "visited(node_name)",
       "ReturnType": "bool",
       "Parameters": [
         {
           "Name": "node_name",
-          "Type": "string",
+          "Type": "String",
           "Documentation": "",
           "IsParamsArray": false
         }
@@ -107,7 +103,7 @@
       "Parameters": [
         {
           "Name": "node_name",
-          "Type": "string",
+          "Type": "String",
           "Documentation": "",
           "IsParamsArray": false
         }
@@ -118,8 +114,7 @@
       "DefinitionName": "random",
       "Documentation": "Returns a random number between 0 and 1 each time you call it.",
       "Signature": "random()",
-      "Parameters": [],
-      "ReturnType": "number"
+      "Parameters": []
     },
     {
       "YarnName": "random_range",
@@ -129,39 +124,17 @@
       "Parameters": [
         {
           "Name": "a",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "Lower bound (inclusive)",
           "IsParamsArray": false
         },
         {
           "Name": "b",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "Upper bound (inclusive)",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "number"
-    },
-    {
-      "YarnName": "random_range_float",
-      "DefinitionName": "random_range",
-      "Documentation": "Returns a random floating point value between a and b, inclusive.",
-      "Signature": "random_range_float(a, b)",
-      "Parameters": [
-        {
-          "Name": "a",
-          "Type": "number",
-          "Documentation": "Lower bound (inclusive)",
-          "IsParamsArray": false
-        },
-        {
-          "Name": "b",
-          "Type": "number",
-          "Documentation": "Upper bound (inclusive)",
-          "IsParamsArray": false
-        }
-      ],
-      "ReturnType": "number"
+      ]
     },
     {
       "YarnName": "dice",
@@ -171,12 +144,11 @@
       "Parameters": [
         {
           "Name": "sides",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "number"
+      ]
     },
     {
       "YarnName": "round",
@@ -186,12 +158,11 @@
       "Parameters": [
         {
           "Name": "n",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "number"
+      ]
     },
     {
       "YarnName": "round_places",
@@ -201,18 +172,17 @@
       "Parameters": [
         {
           "Name": "n",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "",
           "IsParamsArray": false
         },
         {
           "Name": "places",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "number"
+      ]
     },
     {
       "YarnName": "floor",
@@ -222,12 +192,11 @@
       "Parameters": [
         {
           "Name": "n",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "number"
+      ]
     },
     {
       "YarnName": "ceil",
@@ -237,12 +206,11 @@
       "Parameters": [
         {
           "Name": "n",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "number"
+      ]
     },
     {
       "YarnName": "inc",
@@ -252,12 +220,11 @@
       "Parameters": [
         {
           "Name": "n",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "number"
+      ]
     },
     {
       "YarnName": "dec",
@@ -267,12 +234,11 @@
       "Parameters": [
         {
           "Name": "n",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "number"
+      ]
     },
     {
       "YarnName": "decimal",
@@ -282,12 +248,11 @@
       "Parameters": [
         {
           "Name": "n",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "number"
+      ]
     },
     {
       "YarnName": "int",
@@ -297,75 +262,11 @@
       "Parameters": [
         {
           "Name": "n",
-          "Type": "number",
+          "Type": "Number",
           "Documentation": "",
           "IsParamsArray": false
         }
-      ],
-      "ReturnType": "number"
-    },
-    {
-      "YarnName": "min",
-      "DefinitionName": "min",
-      "Documentation": "Compares a and b, and returns the smaller of the two.",
-      "Signature": "min(a,b)",
-      "Parameters": [
-        {
-          "Name": "a",
-          "Type": "number",
-          "Documentation": "The first number to compare.",
-          "IsParamsArray": false
-        },
-        {
-          "Name": "b",
-          "Type": "number",
-          "Documentation": "The second number to compare.",
-          "IsParamsArray": false
-        }
-      ],
-      "ReturnType": "number"
-    },
-    {
-      "YarnName": "max",
-      "DefinitionName": "max",
-      "Documentation": "Compares a and b, and returns the larger of the two.",
-      "Signature": "max(a,b)",
-      "Parameters": [
-        {
-          "Name": "a",
-          "Type": "number",
-          "Documentation": "The first number to compare.",
-          "IsParamsArray": false
-        },
-        {
-          "Name": "b",
-          "Type": "number",
-          "Documentation": "The second number to compare.",
-          "IsParamsArray": false
-        }
-      ],
-      "ReturnType": "number"
-    },
-    {
-      "YarnName": "format",
-      "DefinitionName": "format",
-      "Documentation": "Formats the argument parameter into the format_string. Intended for user facing text. Is a wrapper around String.Format and uses the format string rules from that.",
-      "Signature": "format(format_string, argument)",
-      "Parameters": [
-        {
-          "Name": "format_string",
-          "Type": "string",
-          "Documentation": "The format string that argument is to be injected into. Must follow C# string format rules.",
-          "IsParamsArray": false
-        },
-        {
-          "Name": "argument",
-          "Type": "any",
-          "Documentation": "The value to be injected into the format_string",
-          "IsParamsArray": false
-        }
-      ],
-      "ReturnType": "string"
+      ]
     }
   ]
 }

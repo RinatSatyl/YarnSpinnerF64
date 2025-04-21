@@ -1,5 +1,7 @@
-﻿using Newtonsoft.Json;
+﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using Newtonsoft.Json;
 
 namespace YarnLanguageServer
 {
@@ -11,16 +13,14 @@ namespace YarnLanguageServer
         {
             var parsedConfig = JsonConvert.DeserializeObject<JsonConfigFormat>(text);
 
-            foreach (var definition in parsedConfig.Functions)
-            {
+            foreach (var definition in parsedConfig.Functions) {
                 Action action = definition.ToAction();
                 action.IsBuiltIn = isBuiltIn;
                 action.Type = ActionType.Function;
                 actions.Add(action);
             }
 
-            foreach (var definition in parsedConfig.Commands)
-            {
+            foreach (var definition in parsedConfig.Commands) {
                 Action action = definition.ToAction();
                 action.IsBuiltIn = isBuiltIn;
                 action.Type = ActionType.Command;
@@ -33,15 +33,10 @@ namespace YarnLanguageServer
             return actions;
         }
 
-        internal void MergeWith(JsonConfigFile newFile)
-        {
-            this.actions.AddRange(newFile.actions);
-        }
-
         internal class JsonConfigFormat
         {
-            public List<RegisteredDefinition> Functions { get; set; } = new();
-            public List<RegisteredDefinition> Commands { get; set; } = new();
+            public List<RegisteredDefinition> Functions { get; set; } = new ();
+            public List<RegisteredDefinition> Commands { get; set; } = new ();
         }
     }
 }

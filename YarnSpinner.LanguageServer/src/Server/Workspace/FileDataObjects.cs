@@ -1,7 +1,7 @@
-﻿using Antlr4.Runtime;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Antlr4.Runtime;
 using Yarn;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -20,7 +20,7 @@ namespace YarnLanguageServer
         public bool IsBuiltIn;
 
         /// <summary>
-        /// Converts this <see cref="RegisteredDefinition"/> from.
+        /// Converts this <see cref="RegisteredDefinition"/> from 
         /// </summary>
         /// <returns></returns>
         internal Action ToAction()
@@ -38,32 +38,25 @@ namespace YarnLanguageServer
                         Description = p.Documentation,
                         DisplayTypeName = p.Type,
                         IsParamsArray = p.IsParamsArray,
-                        Type = GetYarnType(p.Type) ?? Types.Any,
+                        Type = GetYarnType(p.Type),
                     };
                 }).ToList(),
-                VariadicParameterType = GetYarnType(this.VariadicParameterType),
                 ReturnType = GetYarnType(this.ReturnType),
                 SourceFileUri = this.DefinitionFile,
-                Language = this.Language ?? "csharp",
                 SourceRange = this.DefinitionRange,
             };
             return action;
         }
 
-        private static IType? GetYarnType(string? type)
+        private static IType GetYarnType(string? type)
         {
-            if (type == null)
+            return type?.ToLowerInvariant() switch
             {
-                return null;
-            }
-
-            return type.ToLowerInvariant() switch
-            {
-                "string" => Yarn.Types.String,
-                "bool" => Yarn.Types.Boolean,
-                "number" or "float" or "int" => Yarn.Types.Number,
-                _ => Yarn.Types.Any,
-            };
+                "string" => Yarn.BuiltinTypes.String,
+                "bool" => Yarn.BuiltinTypes.Boolean,
+                "number" or "float" or "int" => Yarn.BuiltinTypes.Number,
+                _ => Yarn.BuiltinTypes.Any,
+            } ?? Yarn.BuiltinTypes.Any;
         }
 
         public int Priority; // If multiple defined using the same filetype, lower priority wins.
@@ -73,10 +66,7 @@ namespace YarnLanguageServer
         public string FileName; // an optional field used exlusively to aid searching for fuller info for things defined in json
 
         // For functions, the name of the return type of this action
-        public string? ReturnType;
-
-        // For functions, the name of the type that optional parameters must be
-        public string? VariadicParameterType;
+        public string ReturnType;
     }
 
     public struct ParameterInfo

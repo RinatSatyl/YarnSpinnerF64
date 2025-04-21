@@ -1,4 +1,10 @@
-﻿using Google.Protobuf;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using Google.Protobuf;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -6,25 +12,30 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using OmniSharp.Extensions.LanguageServer.Server;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
-[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("YarnLanguageServer.Tests")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("LanguageServer.Tests")]
 
 namespace YarnLanguageServer
 {
     public class YarnLanguageServer
     {
-        private static ILanguageServer? server;
 
-        public static ILanguageServer Server
+        public static ILanguageServer server;
+
+        private static async Task Main(string[] args)
         {
-            get => server ?? throw new InvalidOperationException("Server has not yet been initialized.");
-            set => server = value;
+            if (args.Contains("--waitForDebugger"))
+            {
+                while (!Debugger.IsAttached) { await Task.Delay(100).ConfigureAwait(false); }
+            }
+
+            server = await LanguageServer.From(
+                options => ConfigureOptions(options)
+                    .WithInput(Console.OpenStandardInput())
+                    .WithOutput(Console.OpenStandardOutput())
+            ).ConfigureAwait(false);
+
+            await server.WaitForExit.ConfigureAwait(false);
         }
 
         public static LanguageServerOptions ConfigureOptions(LanguageServerOptions options)
@@ -49,23 +60,20 @@ namespace YarnLanguageServer
                 .WithHandler<Handlers.FileOperationsHandler>()
                 .OnInitialize(async (server, request, token) =>
                 {
-                    try
-                    {
+                    try {
                         workspace.Root = request.RootPath;
 
                         server.Log("Server initialize.");
 
                         // avoid re-initializing if possible by getting config settings in early
-                        if (request.InitializationOptions is JArray optsArray)
+                        if (request.InitializationOptions != null)
                         {
-                            workspace.Configuration.Initialize(optsArray);
+                            workspace.Configuration.Initialize(request.InitializationOptions as Newtonsoft.Json.Linq.JArray);
                         }
-
-                        workspace.Initialize(server, token);
+                        
+                        workspace.Initialize(server);
                         await Task.CompletedTask.ConfigureAwait(false);
-                    }
-                    catch (Exception e)
-                    {
+                    } catch (Exception e) {
                         server.Window.ShowError($"Yarn Spinner language server failed to start: {e}");
                         await Task.FromException(e).ConfigureAwait(false);
                     }
@@ -77,7 +85,9 @@ namespace YarnLanguageServer
                 .OnStarted(async (server, token) =>
                 {
                     await Task.CompletedTask.ConfigureAwait(false);
-                });
+                })
+
+                ;
 
             // Register 'List Nodes' command
             options.OnExecuteCommand<Container<NodeInfo>>(
@@ -117,7 +127,7 @@ namespace YarnLanguageServer
 
             // Register 'Compile' command
             options.OnExecuteCommand<CompilerOutput>(
-                (commandParams, cancellationToken) => CompileCurrentProjectAsync(workspace, commandParams, cancellationToken),
+                (commandParams) => CompileCurrentProject(workspace, commandParams),
                 (_, _) => new ExecuteCommandRegistrationOptions
                 {
                     Commands = new[] { Commands.CompileCurrentProject },
@@ -126,7 +136,7 @@ namespace YarnLanguageServer
 
             // Register 'extract voiceovers' command
             options.OnExecuteCommand<VOStringExport>(
-                (commandParams) => ExtractVoiceoverSpreadsheetAsync(workspace, commandParams), (_, _) => new ExecuteCommandRegistrationOptions
+                (commandParams) => ExtractVoiceoverSpreadsheet(workspace, commandParams), (_,_) => new ExecuteCommandRegistrationOptions
                 {
                     Commands = new[] { Commands.ExtractSpreadsheet },
                 }
@@ -134,122 +144,35 @@ namespace YarnLanguageServer
 
             // register graph dialogue command
             options.OnExecuteCommand<string>(
-                (commandParams) => GenerateDialogueGraphAsync(workspace, commandParams), (_, _) => new ExecuteCommandRegistrationOptions
+                (commandParams) => GenerateDialogueGraph(workspace, commandParams), (_,_) => new ExecuteCommandRegistrationOptions
                 {
                     Commands = new[] { Commands.CreateDialogueGraph },
-                }
-            );
-
-            // generate debug information for all projects
-            options.OnExecuteCommand<Container<DebugOutput>>(
-                (commandParams, cancellationToken) => GenerateDebugOutputAsync(workspace, commandParams, cancellationToken),
-                (_, _) => new ExecuteCommandRegistrationOptions
-                {
-                    Commands = new[] { Commands.GenerateDebugOutput },
-                }
-            );
-
-            // register 'return json for new project' command
-            options.OnExecuteCommand<string>(
-                (commandParams) => GetEmptyYarnProjectJSONAsync(workspace, commandParams),
-                (_, _) => new ExecuteCommandRegistrationOptions
-                {
-                    Commands = new[] { Commands.GetEmptyYarnProjectJSON },
-                }
-            );
-
-            // Register List Projects command
-            options.OnExecuteCommand<Container<ProjectInfo>>(
-                (commandParams) => ListProjectsAsync(workspace, commandParams), (_, _) => new ExecuteCommandRegistrationOptions
-                {
-                    Commands = new[] { Commands.ListProjects },
                 }
             );
 
             return options;
         }
 
-        public static Task<Container<DebugOutput>> GenerateDebugOutputAsync(Workspace workspace, ExecuteCommandParams<Container<DebugOutput>> commandParams, CancellationToken cancellationToken)
-        {
-            var results = workspace.Projects.Select(project =>
-            {
-                return project.GetDebugOutput(cancellationToken);
-            });
-
-            return Task.FromResult(new Container<DebugOutput>(results));
-        }
-
-        public static Task<string> GetEmptyYarnProjectJSONAsync(Workspace workspace, ExecuteCommandParams<string> commandParams)
-        {
-            var project = new Yarn.Compiler.Project();
-
-            return Task.FromResult(project.GetJson());
-        }
-
-        private static async Task Main(string[] args)
-        {
-            if (args.Contains("--waitForDebugger"))
-            {
-                while (!Debugger.IsAttached) { await Task.Delay(100).ConfigureAwait(false); }
-            }
-
-            Server = await LanguageServer.From(
-                options => ConfigureOptions(options)
-                    .WithInput(Console.OpenStandardInput())
-                    .WithOutput(Console.OpenStandardOutput())
-            ).ConfigureAwait(false);
-
-            await Server.WaitForExit.ConfigureAwait(false);
-        }
-
-        private static Task<Container<ProjectInfo>> ListProjectsAsync(Workspace workspace, ExecuteCommandParams<Container<ProjectInfo>> commandParams)
-        {
-            var info = workspace.Projects.Select(p => new ProjectInfo
-            {
-                Uri = p.Uri,
-                Files = p.Files.Select(f => OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(f.Uri)),
-                IsImplicitProject = p.IsImplicitProject,
-            });
-            return Task.FromResult(Container.From(info));
-        }
-
         private static Task<TextDocumentEdit> AddNodeToDocumentAsync(Workspace workspace, ExecuteCommandParams<TextDocumentEdit> commandParams)
         {
-            if (commandParams.Arguments == null)
-            {
-                // No arguments supplied
-                workspace.ShowMessage($"{nameof(AddNodeToDocumentAsync)}: No arguments supplied", MessageType.Error);
-
-                return Task.FromResult<TextDocumentEdit>(new());
-            }
-
             var yarnDocumentUriString = commandParams.Arguments[0].ToString();
 
             var headers = new Dictionary<string, string>();
 
-            if (commandParams.Arguments.Count >= 2)
-            {
-                if (commandParams.Arguments[1] is JObject headerObject)
-                {
-                    foreach (var property in headerObject)
-                    {
-                        headers.Add(property.Key, property.Value.ToString());
-                    }
-                }
-                else
-                {
-                    workspace.ShowMessage("AddNodeToDocumentAsync: Argument 1 is expected to be an Object", MessageType.Error);
+            if (commandParams.Arguments.Count >= 2) {
+                var headerObject = commandParams.Arguments[1] as JObject;
 
-                    return Task.FromResult<TextDocumentEdit>(new());
+                foreach (var property in headerObject) {
+                    headers.Add(property.Key, property.Value.ToString());
                 }
             }
 
-            Uri yarnDocumentUri = new(yarnDocumentUriString);
+            Uri yarnDocumentUri = new (yarnDocumentUriString);
 
             var project = workspace.GetProjectsForUri(yarnDocumentUri).FirstOrDefault();
             var yarnFile = project?.GetFileData(yarnDocumentUri);
 
-            if (project == null || yarnFile == null)
+            if (yarnFile == null)
             {
                 workspace.ShowMessage($"Can't add node: {yarnDocumentUri} is not a part of any project", MessageType.Error);
 
@@ -263,12 +186,13 @@ namespace YarnLanguageServer
                     },
                     Edits = new List<TextEdit>(),
                 });
+            
             }
 
             // Work out the edit needed to add a node.
 
             // Figure out the name of the new node.
-            var allNodeTitles = project.Files.SelectMany(yf => yf.NodeInfos).Select(n => n.UniqueTitle);
+            var allNodeTitles = project.Files.SelectMany(yf => yf.NodeInfos).Select(n => n.Title);
 
             var candidateCount = 0;
             var candidateName = "Node";
@@ -281,10 +205,9 @@ namespace YarnLanguageServer
 
             var newNodeText = new System.Text.StringBuilder()
                 .AppendLine($"title: {candidateName}");
-
+           
             // Add the headers
-            foreach (var h in headers)
-            {
+            foreach (var h in headers) {
                 newNodeText.AppendLine($"{h.Key}: {h.Value}");
             }
 
@@ -342,19 +265,11 @@ namespace YarnLanguageServer
 
         private static Task<TextDocumentEdit> RemoveNodeFromDocumentAsync(Workspace workspace, ExecuteCommandParams<TextDocumentEdit> commandParams)
         {
-            if (commandParams.Arguments == null)
-            {
-                // No arguments supplied
-                workspace.ShowMessage($"{nameof(RemoveNodeFromDocumentAsync)}: No arguments supplied", MessageType.Error);
-
-                return Task.FromResult<TextDocumentEdit>(new());
-            }
-
             var yarnDocumentUriString = commandParams.Arguments[0].ToString();
 
             var nodeTitle = commandParams.Arguments[1].ToString();
 
-            Uri yarnDocumentUri = new(yarnDocumentUriString);
+            Uri yarnDocumentUri = new (yarnDocumentUriString);
 
             TextDocumentEdit emptyResult = new TextDocumentEdit
             {
@@ -377,10 +292,9 @@ namespace YarnLanguageServer
             }
 
             // First: does this file contain a node with this title?
-            var nodes = yarnFile.NodeInfos.Where(n => n.UniqueTitle == nodeTitle);
+            var nodes = yarnFile.NodeInfos.Where(n => n.Title == nodeTitle);
 
-            if (nodes.Count() != 1)
-            {
+            if (nodes.Count() != 1) {
                 // We need precisely 1 node to remove.
                 var multipleNodesMessage = $"multiple nodes named {nodeTitle} exist in this file";
                 var noNodeMessage = $"no node named {nodeTitle} exists in this file";
@@ -421,27 +335,15 @@ namespace YarnLanguageServer
 
         private static Task<TextDocumentEdit> UpdateNodeHeaderAsync(Workspace workspace, ExecuteCommandParams<TextDocumentEdit> commandParams)
         {
-            if (commandParams.Arguments == null)
-            {
-                // No arguments supplied
-                workspace.ShowMessage($"{nameof(UpdateNodeHeaderAsync)}: No arguments supplied", MessageType.Error);
-
-                return Task.FromResult<TextDocumentEdit>(new());
-            }
-
             var yarnDocumentUriString = commandParams.Arguments[0].ToString();
 
             var nodeTitle = commandParams.Arguments[1].ToString();
 
             var headerKey = commandParams.Arguments[2].ToString();
 
-            var headerValueToken = commandParams.Arguments[3];
+            var headerValue = commandParams.Arguments[3].ToString();
 
-            var headerValue = headerValueToken.Type == JTokenType.String
-                ? headerValueToken.Value<string>()
-                : null;
-
-            Uri yarnDocumentUri = new(yarnDocumentUriString);
+            Uri yarnDocumentUri = new (yarnDocumentUriString);
 
             TextDocumentEdit emptyResult = new TextDocumentEdit
             {
@@ -464,10 +366,9 @@ namespace YarnLanguageServer
             }
 
             // Does this file contain a node with this title?
-            var nodes = yarnFile.NodeInfos.Where(n => n.UniqueTitle == nodeTitle);
+            var nodes = yarnFile.NodeInfos.Where(n => n.Title == nodeTitle);
 
-            if (nodes.Count() != 1)
-            {
+            if (nodes.Count() != 1) {
                 // We need precisely 1 node to modify.
                 var multipleNodesMessage = $"multiple nodes named {nodeTitle} exist in this file";
                 var noNodeMessage = $"no node named {nodeTitle} exists in this file";
@@ -483,42 +384,25 @@ namespace YarnLanguageServer
             // Does this node contain a header with this title?
             var existingHeader = node.Headers.Find(h => h.Key == headerKey);
 
-            if (headerValue == null && existingHeader == null)
-            {
-                // We want to delete this header, but it's already not there.
-                // There's nothing to do.
-                return Task.FromResult(emptyResult);
-            }
-
-            string headerText;
+            var headerText = $"{headerKey}: {headerValue}";
 
             Position startPosition;
             Position endPosition;
 
-            if (existingHeader != null)
-            {
+            if (existingHeader != null) {
                 // Create an edit to replace it
                 var line = existingHeader.KeyToken.Line - 1;
                 startPosition = new Position(line, 0);
-                endPosition = new Position(line + 1, 0);
-                if (headerValue == null)
-                {
-                    headerText = "";
-                }
-                else
-                {
-                    headerText = $"{headerKey}: {headerValue}" + Environment.NewLine;
-                }
-            }
-            else
-            {
+                endPosition = new Position(line, yarnFile.GetLineLength(line));
+            } else {
                 // Create an edit to insert it immediately before the body start
                 // delimiter
                 var line = node.BodyStartLine - 1;
                 startPosition = new Position(line, 0);
                 endPosition = new Position(line, 0);
-
-                headerText = $"{headerKey}: {headerValue}" + Environment.NewLine;
+                
+                // Add a newline so that the delimiter stays on its own line
+                headerText += Environment.NewLine;
             }
 
             // Return the edit that creates or updates this header
@@ -541,20 +425,13 @@ namespace YarnLanguageServer
         {
             var result = new List<NodeInfo>();
 
-            var yarnDocumentUriString = commandParams.Arguments?[0].ToString();
+            var yarnDocumentUriString = commandParams.Arguments[0].ToString();
 
-            if (yarnDocumentUriString == null)
-            {
-                // We don't have a project for this file. Return the empty collection.
-                return Task.FromException<Container<NodeInfo>>(new InvalidOperationException("No document URI was provided."));
-            }
+            Uri yarnDocumentUri = new (yarnDocumentUriString);
 
-            Uri yarnDocumentUri = new(yarnDocumentUriString);
+            var project = workspace.GetProjectsForUri(yarnDocumentUri).FirstOrDefault ();
 
-            var project = workspace.GetProjectsForUri(yarnDocumentUri).FirstOrDefault();
-
-            if (project == null)
-            {
+            if (project == null) {
                 // We don't have a project for this file. Return the empty collection.
                 return Task.FromResult(new Container<NodeInfo>());
             }
@@ -569,10 +446,9 @@ namespace YarnLanguageServer
             return Task.FromResult<Container<NodeInfo>>(result);
         }
 
-        private static Task<CompilerOutput> CompileCurrentProjectAsync(Workspace workspace, ExecuteCommandParams<CompilerOutput> commandParams, CancellationToken cancellationToken)
+        private static Task<CompilerOutput> CompileCurrentProject(Workspace workspace, ExecuteCommandParams<CompilerOutput> commandParams)
         {
-            if (commandParams.Arguments == null)
-            {
+            if (commandParams.Arguments == null) {
                 throw new ArgumentException(Commands.CompileCurrentProject + " expects arguments");
             }
 
@@ -586,7 +462,7 @@ namespace YarnLanguageServer
             // compilation (which will produce the compiled program's bytecode.)
             // This will also have the effect of updating the workspace's
             // diagnostics.
-            var result = project.CompileProject(true, Yarn.Compiler.CompilationJob.Type.FullCompilation, cancellationToken);
+            var result = project.CompileProject(true, Yarn.Compiler.CompilationJob.Type.FullCompilation);
 
             var errors = result.Diagnostics.Where(d => d.Severity == Yarn.Compiler.Diagnostic.DiagnosticSeverity.Error).Select(d => d.ToString());
 
@@ -597,48 +473,29 @@ namespace YarnLanguageServer
 
                 return Task.FromResult(new CompilerOutput
                 {
-                    Data = string.Empty,
+                    Data = Array.Empty<byte>(),
                     StringTable = new Dictionary<string, string>(),
                     Errors = errors.ToArray(),
                 });
             }
 
             var strings = new Dictionary<string, string>();
-            var metadata = new Dictionary<string, MetadataOutput>();
-
-            foreach (var line in result.StringTable ?? Enumerable.Empty<KeyValuePair<string, Yarn.Compiler.StringInfo>>())
+            foreach (var line in result.StringTable)
             {
-                if (line.Value.text == null)
-                {
-                    continue;
-                }
-
                 strings[line.Key] = line.Value.text;
-
-                var metadataEntry = new MetadataOutput
-                {
-                    ID = line.Key,
-                    LineNumber = line.Value.lineNumber.ToString(),
-                    Node = line.Value.nodeName,
-                    Tags = line.Value.metadata.Where(tag => tag.StartsWith("line:") == false).ToArray(),
-                };
-
-                metadata[line.Key] = metadataEntry;
             }
 
             return Task.FromResult(new CompilerOutput
             {
-                Data = Convert.ToBase64String(result.Program?.ToByteArray() ?? Array.Empty<byte>()),
+                Data = result.Program?.ToByteArray() ?? Array.Empty<byte>(),
                 StringTable = strings,
-                MetadataTable = metadata,
                 Errors = Array.Empty<string>(),
             });
         }
 
-        private static Task<string> GenerateDialogueGraphAsync(Workspace workspace, ExecuteCommandParams<string> commandParams)
+        private static Task<string> GenerateDialogueGraph(Workspace workspace, ExecuteCommandParams<string> commandParams)
         {
-            if (commandParams.Arguments == null)
-            {
+            if (commandParams.Arguments == null) {
                 throw new ArgumentException(Commands.CreateDialogueGraph + " expects arguments");
             }
 
@@ -670,7 +527,7 @@ namespace YarnLanguageServer
             {
                 graphString = DrawMermaid(graph, clustering);
             }
-
+            
             // then we send that back over
             return Task.FromResult(graphString);
         }
@@ -693,7 +550,6 @@ namespace YarnLanguageServer
                 {
                     sb.AppendLine($"\tsubgraph a{i}");
                 }
-
                 foreach (var node in cluster)
                 {
                     foreach (var jump in node.jumps)
@@ -701,18 +557,14 @@ namespace YarnLanguageServer
                         sb.AppendLine($"\t{node.node}-->{jump}");
                     }
                 }
-
                 if (clustering)
                 {
                     sb.AppendLine("\tend");
                 }
-
                 i++;
             }
-
             return sb.ToString();
         }
-
         private static string DrawDot(List<List<Yarn.Compiler.GraphingNode>> graph, bool clustering)
         {
             // using three individual builders is a bit lazy but it means I can turn stuff on and off as needed
@@ -730,7 +582,7 @@ namespace YarnLanguageServer
                     {
                         continue;
                     }
-
+                    
                     // they need to be named clusterSomething to be clustered
                     sub.AppendLine($"\tsubgraph cluster{i}{{");
                     sub.Append("\t\t");
@@ -738,7 +590,6 @@ namespace YarnLanguageServer
                     {
                         sub.Append($"{node.node} ");
                     }
-
                     sub.AppendLine(";");
                     sub.AppendLine("\t}");
                     i++;
@@ -761,7 +612,7 @@ namespace YarnLanguageServer
                         links.AppendLine($"\t{connection.node} -> {link};");
                     }
                 }
-            }
+            }   
 
             sb.Append(links);
             sb.Append(sub);
@@ -770,10 +621,10 @@ namespace YarnLanguageServer
             return sb.ToString();
         }
 
-        private static Task<VOStringExport> ExtractVoiceoverSpreadsheetAsync(Workspace workspace, ExecuteCommandParams<VOStringExport> commandParams)
+
+        private static Task<VOStringExport> ExtractVoiceoverSpreadsheet(Workspace workspace, ExecuteCommandParams<VOStringExport> commandParams)
         {
-            if (commandParams.Arguments == null)
-            {
+            if (commandParams.Arguments == null) {
                 throw new ArgumentException(Commands.ExtractSpreadsheet + " expects arguments");
             }
 
@@ -784,8 +635,7 @@ namespace YarnLanguageServer
                 .SelectMany(p => p.Files)
                 .DistinctBy(p => p.Uri);
 
-            // Compiling the whole workspace so we can get access to the program
-            // to make sure it works
+            // compiling the whole workspace so we can get access to the program to make sure it works
             var job = new Yarn.Compiler.CompilationJob
             {
                 Files = allFilesInProject.Select(file =>
@@ -796,80 +646,64 @@ namespace YarnLanguageServer
                         Source = file.Text,
                     };
                 }),
-
                 // Perform a full compilation so that we can produce a basic
                 // block analysis of the file
                 CompilationType = Yarn.Compiler.CompilationJob.Type.FullCompilation,
-                LanguageVersion = project.Max(p => p.FileVersion),
             };
 
             var result = Yarn.Compiler.Compiler.Compile(job);
 
-            byte[] fileData = { };
+            byte[] fileData = {};
             var errorMessages = result.Diagnostics
                 .Where(d => d.Severity == Yarn.Compiler.Diagnostic.DiagnosticSeverity.Error)
                 .Select(d => d.Message)
                 .ToArray();
 
-            if (errorMessages.Length != 0 || result.Program == null || result.ProjectDebugInfo == null || result.StringTable == null)
+            if (errorMessages.Length == 0)
             {
-                // We have errors (or we don't have any material to work with.)
-                return Task.FromResult(new VOStringExport(fileData, errorMessages));
+                // We have no errors, so we can run through the nodes and build
+                // up our blocks of lines.
+                var lineBlocks = Yarn.Compiler.Utility.ExtractStringBlocks(result.Program.Nodes.Values).Select(bs => bs.ToArray()).ToArray();
 
+                // Get the parameters from the command, substituting defaults as
+                // needed
+                string format;
+                string[] columns;
+                string defaultName;
+                bool useCharacters;
+
+                if (commandParams.Arguments.Count > 1) {
+                    format = commandParams.Arguments[1].ToString();
+                } else {
+                    format = "xlsx";
+                }
+
+                if (commandParams.Arguments.Count > 2) {
+                    columns = commandParams.Arguments[2].ToObject<string[]>();
+                } else {
+                    columns = new[] { "id", "text" };
+                }
+
+                if (commandParams.Arguments.Count > 3) {
+                    defaultName = commandParams.Arguments[3].ToString();
+                } else {
+                    defaultName = "Player";
+                }
+
+                if (commandParams.Arguments.Count > 4) {
+                    useCharacters = commandParams.Arguments[4].ToObject<bool>();
+                } else {
+                    useCharacters = true;
+                }
+
+                fileData = StringExtractor.ExportStrings(lineBlocks, result.StringTable, columns, format, defaultName, useCharacters);
             }
 
-            // We have no errors, and we have debug info for this project,
-            // so we can run through the nodes and build up our blocks of
-            // lines.
-            var lineBlocks = Yarn.Compiler.Utility.ExtractStringBlocks(result.Program.Nodes.Values, result.ProjectDebugInfo).Select(bs => bs.ToArray()).ToArray();
-
-            // Get the parameters from the command, substituting defaults as
-            // needed
-            string format;
-            string[] columns;
-            string defaultName;
-            bool useCharacters;
-
-            if (commandParams.Arguments.Count > 1)
+            var output = new VOStringExport
             {
-                format = commandParams.Arguments[1].ToString();
-            }
-            else
-            {
-                format = "xlsx";
-            }
-
-            if (commandParams.Arguments.Count > 2)
-            {
-                columns = commandParams.Arguments[2].ToObject<string[]>();
-            }
-            else
-            {
-                columns = new[] { "id", "text" };
-            }
-
-            if (commandParams.Arguments.Count > 3)
-            {
-                defaultName = commandParams.Arguments[3].ToString();
-            }
-            else
-            {
-                defaultName = "Player";
-            }
-
-            if (commandParams.Arguments.Count > 4)
-            {
-                useCharacters = commandParams.Arguments[4].ToObject<bool>();
-            }
-            else
-            {
-                useCharacters = true;
-            }
-
-            fileData = StringExtractor.ExportStringsAsSpreadsheet(lineBlocks, result.StringTable, columns, format, defaultName, useCharacters);
-
-            var output = new VOStringExport(fileData, errorMessages);
-
+                File = fileData,
+                Errors = errorMessages,
+            };
             return Task.FromResult(output);
         }
     }

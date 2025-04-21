@@ -1,5 +1,21 @@
 # Yarn Spinner
 
+This is a fork of Yarn Spinner 2.4.0 for Fuwamoco Adventure.
+Mainly has changes that allows the game to take control over dialogue's "VirtualMachine" to allow synching its state between clients during online multiplayer.   
+Implemenation from game's side is not included at the moment.
+
+## Building
+To build Yarn you'll need dotnet 6.x (and git bash if you are on Windows).
+Then run "sync-yarnspinner-dlls.sh", and if everything is good and code isn't messed up, it should build all Dlls in to "Output" folder. 
+Then move content of "Output" folder in to " (your YarnSpinner-Unity-2.4.0 folder in project)/Runtime/DLLs/" folder.
+That should do it.
+
+P.S:
+Don't just "dotnet build" from the folder, it will compile Dlls but they will not play nice when put in to Unity project. Trust me bro.
+
+## Usage
+Implementation is quite messy, and since this is older version of Yarn, I won't be tidying it up for merging in to main repo. If some madlad wants this merged to main, feel free to do that but please do credit me as well. I need to farm aura to brag to my mom about my virtual contributions to society.
+
 > [!TIP]
 > To get Yarn Spinner, and support the team behind it, buy a copy for Unity from [the Yarn Spinner Itch.io Store](https://yarnspinner.itch.io) or from [the Unity Asset Store](https://assetstore.unity.com/packages/tools/behavior-ai/yarn-spinner-for-unity-267061), or check out the [Yarn Spinner Documentation](https://docs.yarnspinner.dev) to install from Git.
 

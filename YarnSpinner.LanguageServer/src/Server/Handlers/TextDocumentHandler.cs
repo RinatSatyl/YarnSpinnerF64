@@ -1,3 +1,6 @@
+﻿using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using MediatR;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
@@ -5,9 +8,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace YarnLanguageServer.Handlers
 {
@@ -28,27 +28,24 @@ namespace YarnLanguageServer.Handlers
             var text = request.TextDocument.Text;
             if (!uri.IsFile) { return Unit.Task; }
 
-            var projects = workspace.GetProjectsForUri(uri);
+            var project = workspace.GetProjectsForUri(uri).FirstOrDefault();
 
-            if (!projects.Any())
+            if (project == null)
             {
                 // We don't know what project handles this URI. Log an error.
                 workspace.Window?.LogError($"No known project for URI {uri}");
                 return Unit.Task;
             }
 
-            foreach (var project in projects)
+            if (project.GetFileData(uri) == null)
             {
-                if (project.GetFileData(uri) == null)
-                {
-                    // The file is not already known to the project. Add it to the
-                    // project.
-                    project.AddNewFile(uri, request.TextDocument.Text);
+                // The file is not already known to the project. Add it to the
+                // project.
+                project.AddNewFile(uri, request.TextDocument.Text);
 
-                    // Adding the document to the project may have changed the
-                    // current diagnostics.
-                    workspace.PublishDiagnostics();
-                }
+                // Adding the document to the project may have changed the
+                // current diagnostics.
+                workspace.PublishDiagnostics();
             }
 
             return Unit.Task;
@@ -60,43 +57,37 @@ namespace YarnLanguageServer.Handlers
 
             if (!uri.IsFile) { return Unit.Task; }
 
-            // Find all projects that claim this URI
-            var projects = workspace.GetProjectsForUri(uri);
+            var project = workspace.GetProjectsForUri(uri).FirstOrDefault();
+            var yarnDocument = project?.GetFileData(uri);
 
-            if (!projects.Any())
+            if (project == null)
             {
                 // We don't have a project that includes this URI. Nothing to
                 // be done.
                 return Unit.Task;
             }
 
-            foreach (var project in projects)
+            if (yarnDocument == null)
             {
-                var yarnDocument = project.GetFileData(uri);
-
-                if (yarnDocument == null)
-                {
-                    // We have a project that owns this URI, but no file data for
-                    // it. It's likely that this file was just created. Add this
-                    // file to the project as empty; we will then attempt to apply
-                    // the content changes to this empty document.
-                    yarnDocument = project.AddNewFile(uri, string.Empty);
-                }
-
-                // Next, go through each content change, and apply it.
-                foreach (var contentChange in request.ContentChanges)
-                {
-                    yarnDocument.ApplyContentChange(contentChange);
-                }
-
-                // Finally, update our model using the new content.
-                yarnDocument.Update(yarnDocument.Text);
-                project.CompileProject(
-                    notifyOnComplete: true,
-                    Yarn.Compiler.CompilationJob.Type.TypeCheck,
-                    cancellationToken
-                );
+                // We have a project that owns this URI, but no file data for
+                // it. It's likely that this file was just created. Add this
+                // file to the project as empty; we will then attempt to apply
+                // the content changes to this empty document.
+                yarnDocument = project.AddNewFile(uri, string.Empty);
             }
+
+            // Next, go through each content change, and apply it.
+            foreach (var contentChange in request.ContentChanges)
+            {
+                yarnDocument.ApplyContentChange(contentChange);
+            }
+
+            // Finally, update our model using the new content.
+            yarnDocument.Update(yarnDocument.Text);
+            project.CompileProject(
+                notifyOnComplete: true,
+                Yarn.Compiler.CompilationJob.Type.DeclarationsOnly
+            );
 
             return Unit.Task;
         }

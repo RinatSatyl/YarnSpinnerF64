@@ -23,27 +23,33 @@ public static class DeclarationHelper
     /// declaration's type.</param>
     /// <param name="defaultValue">On return, contains a syntactically-correct
     /// version of the declaration's initial value.</param>
-    public static void GetDeclarationInfo(Yarn.Compiler.Declaration existingDeclaration, out string type, out string defaultValue)
+    /// <returns><see langword="true"/> if <paramref
+    /// name="existingDeclaration"/>'s type was string, number or boolean; <see
+    /// langword="false"/> otherwise.</returns>
+    public static bool GetDeclarationInfo(Yarn.Compiler.Declaration existingDeclaration, out string type, out string defaultValue)
     {
-        if (existingDeclaration.Type == Yarn.Types.String)
+        if (existingDeclaration.Type == Yarn.BuiltinTypes.String)
         {
             type = "string";
-            defaultValue = $"\"{existingDeclaration.DefaultValue ?? string.Empty}\"";
+            defaultValue = $"\"{existingDeclaration.DefaultValue}\"";
         }
-        else if (existingDeclaration.Type == Yarn.Types.Number)
+        else if (existingDeclaration.Type == Yarn.BuiltinTypes.Number)
         {
             type = "number";
-            defaultValue = $"{existingDeclaration.DefaultValue ?? 0}";
+            defaultValue = $"{existingDeclaration.DefaultValue}";
         }
-        else if (existingDeclaration.Type == Yarn.Types.Boolean)
+        else if (existingDeclaration.Type == Yarn.BuiltinTypes.Boolean)
         {
             type = "bool";
             defaultValue = $"{existingDeclaration.DefaultValue?.ToString()?.ToLowerInvariant() ?? "false"}";
         }
         else
         {
-            type = existingDeclaration.Type?.Name ?? "undefined";
-            defaultValue = existingDeclaration.DefaultValue?.ToString() ?? "(?)";
+            type = "undefined";
+            defaultValue = "(?)";
+            return false;
         }
+
+        return true;
     }
 }

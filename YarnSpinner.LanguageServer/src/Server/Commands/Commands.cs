@@ -28,7 +28,7 @@ public static class Commands
     public const string RemoveNode = "yarnspinner.remove-node";
 
     /// <summary>
-    /// The command to create, update, or remove a header for a node in a file.
+    /// The command to create or update a header for a node in a file.
     /// </summary>
     public const string UpdateNodeHeader = "yarnspinner.update-node-header";
 
@@ -64,13 +64,4 @@ public static class Commands
     /// The command to show a specific Yarn node in a graph view.
     /// </summary>
     public const string ShowNodeInGraphView = "yarn.showNodeInGraphView";
-
-    public const string GenerateDebugOutput = "yarnspinner.generateDebugOutput";
-
-    public const string GetEmptyYarnProjectJSON = "yarnspinner.getEmptyYarnProjectJSON";
-
-    /// <summary>
-    /// The command to get all projects in the current workspace.
-    /// </summary>
-    public const string ListProjects = "yarnspinner.listProjects";
 }

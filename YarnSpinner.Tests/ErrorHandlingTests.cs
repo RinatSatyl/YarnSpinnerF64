@@ -1,6 +1,12 @@
-using FluentAssertions;
 using Xunit;
-using Xunit.Abstractions;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using Yarn;
+using System.IO;
+using System.Linq;
+using FluentAssertions;
+
 using Yarn.Compiler;
 
 namespace YarnSpinner.Tests
@@ -9,13 +15,8 @@ namespace YarnSpinner.Tests
 
     public class ErrorHandlingTests : TestBase
     {
-        public ErrorHandlingTests(ITestOutputHelper outputHelper) : base(outputHelper)
-        {
-        }
-
         [Fact]
-        public void TestMalformedIfStatement()
-        {
+        public void TestMalformedIfStatement() {
             var source = CreateTestNode(@"<<if true>> // error: no endif");
 
             var result = Compiler.Compile(CompilationJob.CreateFromString("<input>", source));
@@ -24,8 +25,7 @@ namespace YarnSpinner.Tests
         }
 
         [Fact]
-        public void TestExtraneousElse()
-        {
+        public void TestExtraneousElse() {
             var source = CreateTestNode(@"
             <<if true>>
             One
@@ -39,12 +39,11 @@ namespace YarnSpinner.Tests
 
             result.Diagnostics.Should().Contain(d => d.Message.Contains("More than one <<else>> statement in an <<if>> statement isn't allowed"));
             result.Diagnostics.Should().Contain(d => d.Message.Contains("Unexpected \"endif\" while reading a statement"));
-
+            
         }
 
         [Fact]
-        public void TestEmptyCommand()
-        {
+        public void TestEmptyCommand() {
             var source = CreateTestNode(@"
             <<>>
             ");
@@ -55,8 +54,7 @@ namespace YarnSpinner.Tests
         }
 
         [Fact]
-        public void TestInvalidVariableNameInSetOrDeclare()
-        {
+        public void TestInvalidVariableNameInSetOrDeclare() {
             var source1 = CreateTestNode(@"
             <<set test = 1>>
             ");
@@ -64,9 +62,8 @@ namespace YarnSpinner.Tests
             var source2 = CreateTestNode(@"
             <<declare test = 1>>
             ");
-
-            foreach (var source in new[] { source1, source2 })
-            {
+            
+            foreach (var source in new[] { source1, source2}) {
 
                 var result = Compiler.Compile(CompilationJob.CreateFromString("<input>", source));
 
@@ -82,20 +79,6 @@ namespace YarnSpinner.Tests
             var result = Compiler.Compile(CompilationJob.CreateFromString("<input>", source));
 
             result.Diagnostics.Should().Contain(d => d.Message.Contains(@"Unexpected "">>"" while reading a function call"));
-        }
-
-        // testing that warnings are generated for empty nodes
-        [Fact]
-        public void TestEmptyNodesGenerateWarnings()
-        {
-            var source = CreateTestNode("", "Start");
-
-            var result = Compiler.Compile(CompilationJob.CreateFromString("<inputs>", source));
-
-            var warning = result.Diagnostics.Should().ContainSingle().Subject;
-            // there should be only one diagnostic: a warning about empty nodes
-            warning.Severity.Should().Be(Diagnostic.DiagnosticSeverity.Warning);
-            warning.Message.Should().Be("Node \"Start\" is empty and will not be included in the compiled output.");
         }
     }
 }

@@ -1,7 +1,7 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System;
+﻿using System;
 using System.Linq;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace YarnLanguageServer
 {
@@ -9,6 +9,8 @@ namespace YarnLanguageServer
     {
         // This whole setup will probably get reworked once I get a days away from staring at Visual Studio configuaration documentation
         private bool csharplookup = false;
+        
+        private bool needReinitialize = false;
 
         public bool CSharpLookup
         {
@@ -18,12 +20,12 @@ namespace YarnLanguageServer
                 if (csharplookup != value)
                 {
                     csharplookup = value;
+                    needReinitialize = true;
                 }
             }
         }
 
-        public static class Defaults
-        {
+        public static class Defaults {
             public const float DidYouMeanThreshold = 0.24f;
         }
 
@@ -39,6 +41,7 @@ namespace YarnLanguageServer
                 JsonSerializer.CreateDefault().Populate(values[0].CreateReader(), this);
             }
             catch (Exception) { }
+            needReinitialize = false;
         }
 
         public void Update(JToken wrappedValue)
@@ -47,12 +50,8 @@ namespace YarnLanguageServer
             try
             {
                 // todo clean up this late night code
-                var value = wrappedValue.Children().FirstOrDefault()?.Children().FirstOrDefault();
-
-                if (value != null)
-                {
-                    JsonSerializer.CreateDefault().Populate(value.CreateReader(), this);
-                }
+                var value = wrappedValue.Children().FirstOrDefault().Children().FirstOrDefault();
+                JsonSerializer.CreateDefault().Populate(value.CreateReader(), this);
             }
             catch (Exception) { }
         }

@@ -1,0 +1,16 @@
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/bin/Release/netstandard2.0/YarnSpinner.deps.json
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/bin/Release/netstandard2.0/YarnSpinner.dll
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/bin/Release/netstandard2.0/YarnSpinner.pdb
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/bin/Release/netstandard2.0/YarnSpinner.xml
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/bin/Release/netstandard2.0/Google.Protobuf.dll
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/bin/Release/netstandard2.0/System.Buffers.dll
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/bin/Release/netstandard2.0/System.Memory.dll
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/bin/Release/netstandard2.0/System.Numerics.Vectors.dll
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/bin/Release/netstandard2.0/System.Runtime.CompilerServices.Unsafe.dll
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/obj/Release/netstandard2.0/YarnSpinner.csproj.AssemblyReference.cache
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/obj/Release/netstandard2.0/YarnSpinner.GeneratedMSBuildEditorConfig.editorconfig
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/obj/Release/netstandard2.0/YarnSpinner.csproj.CoreCompileInputs.cache
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/obj/Release/netstandard2.0/YarnSpin.77108D2A.Up2Date
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/obj/Release/netstandard2.0/YarnSpinner.dll
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/obj/Release/netstandard2.0/YarnSpinner.xml
+/home/rin_iota/Загрузки/YarnSpinner-2.4.0 (2)/YarnSpinner/obj/Release/netstandard2.0/YarnSpinner.pdb

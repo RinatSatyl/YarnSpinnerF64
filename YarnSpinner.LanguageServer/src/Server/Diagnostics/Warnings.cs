@@ -1,8 +1,8 @@
-﻿using MoreLinq;
+﻿using System.Collections.Generic;
+using System.Linq;
+using MoreLinq;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System.Collections.Generic;
-using System.Linq;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace YarnLanguageServer.Diagnostics
@@ -16,19 +16,12 @@ namespace YarnLanguageServer.Diagnostics
             results = results.Concat(UnknownCommands(yarnFile));
             results = results.Concat(UndefinedFunctions(yarnFile, configuration));
             results = results.Concat(UndeclaredVariables(yarnFile));
-            results = results.Concat(UndefinedJumpDestination(yarnFile));
 
             return results;
         }
 
         private static IEnumerable<Diagnostic> UnknownCommands(YarnFileData yarnFile)
         {
-            if (yarnFile.Project == null)
-            {
-                // No known project for this file; no diagnostics we can produce
-                yield break;
-            }
-
             var knownCommands = yarnFile.Project.Commands;
             foreach (var commandReference in yarnFile.CommandReferences)
             {
@@ -57,13 +50,7 @@ namespace YarnLanguageServer.Diagnostics
             }
 
             var project = yarnFile.Project;
-            var knownFunctions = project?.Functions;
-
-            if (knownFunctions == null)
-            {
-                // No known functions; we can't produce any diagnostics
-                yield break;
-            }
+            var knownFunctions = project.Functions;
 
             foreach (var functionReference in yarnFile.FunctionReferences)
             {
@@ -86,12 +73,6 @@ namespace YarnLanguageServer.Diagnostics
         {
             var project = yarnFile.Project;
 
-            if (project == null)
-            {
-                // No project, so no diagnostics we can produce
-                return Enumerable.Empty<Diagnostic>();
-            }
-
             // Find all variable references in this file where the declaration,
             // if any, is an implicit one. If it is, then we should suggest that
             // the user create a declaration for it.
@@ -108,28 +89,6 @@ namespace YarnLanguageServer.Diagnostics
                 Range = PositionHelper.GetRange(yarnFile.LineStarts, v),
                 Code = nameof(YarnDiagnosticCode.YRNMsngVarDec),
                 Data = JToken.FromObject(v.Text),
-            });
-        }
-
-        private static IEnumerable<Diagnostic> UndefinedJumpDestination(YarnFileData yarnFile)
-        {
-            var project = yarnFile.Project;
-
-            if (project == null)
-            {
-                return Enumerable.Empty<Diagnostic>();
-            }
-
-            var undefinedJumpTargets = yarnFile.NodeJumps
-                .Where(jump => !project.FindNodes(jump.DestinationTitle).Any());
-
-            return undefinedJumpTargets.Select(t => new Diagnostic
-            {
-                Message = $"Jump to unknown node '{t.DestinationTitle}'",
-                Severity = DiagnosticSeverity.Warning,
-                Range = PositionHelper.GetRange(yarnFile.LineStarts, t.DestinationToken),
-                Code = nameof(YarnDiagnosticCode.YRNMsngJumpDest),
-                Data = JToken.FromObject(t.DestinationTitle),
             });
         }
     }

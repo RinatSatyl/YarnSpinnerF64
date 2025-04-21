@@ -1,13 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading;
 using YarnLanguageServer.Diagnostics;
 
 namespace YarnLanguageServer
@@ -25,12 +24,12 @@ namespace YarnLanguageServer
     public class Workspace : INotificationSender, IActionSource, IConfigurationSource
     {
         public string? Root { get; internal set; }
-        public IWindowLanguageServer? Window => LanguageServer?.Window;
-
         internal Configuration Configuration { get; set; } = new Configuration();
         internal IEnumerable<Project> Projects { get; set; } = Array.Empty<Project>();
 
         private ILanguageServer? LanguageServer { get; set; }
+
+        public IWindowLanguageServer? Window => LanguageServer?.Window;
 
         /// <summary>
         /// Have we shown a warning about the workspace having no root folder?
@@ -61,129 +60,49 @@ namespace YarnLanguageServer
 
         Configuration IConfigurationSource.Configuration => this.Configuration;
 
-        /// <summary>
-        /// Sends the DidChangeNodesNotification message to the client, which
-        /// contains semantic information about the nodes in this file.
-        /// </summary>
-        /// <seealso cref="Commands.DidChangeNodesNotification"/>
-        public void PublishNodeInfos()
-        {
-            foreach (var file in this.Projects.SelectMany(p => p.Files))
-            {
-                this.LanguageServer?.SendNotification(
-                    Commands.DidChangeNodesNotification,
-                    new NodesChangedParams(file.Uri, file.NodeInfos)
-                );
-
-            }
-        }
-
-        public void SendNotification<T>(string method, T @params)
-        {
-            this.LanguageServer?.SendNotification<T>(method, @params);
-        }
-
-        IEnumerable<Action> IActionSource.GetActions() => this.workspaceActions;
-
-        /// <summary>
-        /// Returns the collection of Action objects that are pre-defined in the
-        /// Yarn language.
-        /// </summary>
-        /// <returns>The list of pre-defined actions.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when loading the
-        /// list of pre-defined actions fails.</exception>
-        internal static IEnumerable<Action> GetPredefinedActions()
-        {
-            var predefinedActions = new List<Action>();
-
-            var thisAssembly = typeof(Workspace).Assembly;
-            var resources = thisAssembly.GetManifestResourceNames();
-            var jsonAssemblyFiles = resources.Where(r => r.EndsWith("ysls.json"));
-
-            foreach (var doc in jsonAssemblyFiles)
-            {
-                Stream? stream = thisAssembly.GetManifestResourceStream(doc);
-
-                if (stream == null)
-                {
-                    throw new InvalidOperationException($"Failed to read manifest resource stream for {doc}");
-                }
-
-                string text = new StreamReader(stream).ReadToEnd();
-                var docJsonConfig = new JsonConfigFile(text, true);
-
-                predefinedActions.AddRange(docJsonConfig.GetActions());
-            }
-
-            return predefinedActions;
-        }
-
-        internal static IEnumerable<T> FuzzySearchItem<T>(IEnumerable<(string name, T item)> items, string name, float threshold)
-        {
-            var lev = new Fastenshtein.Levenshtein(name.ToLower());
-
-            return items.Select(searchItem =>
-                {
-                    float distance = lev.DistanceFrom(searchItem.name.ToLower());
-                    var normalizedDistance = distance / Math.Max(Math.Max(name.Length, searchItem.name.Length), 1);
-
-                    if (distance <= 1
-                        || searchItem.name.Contains(name, StringComparison.OrdinalIgnoreCase)
-                        || name.Contains(searchItem.name, StringComparison.OrdinalIgnoreCase))
-                    {
-                        // include strings that contain each other even if they don't meet the threshold
-                        // usecase is more the user didn't finish typing instead of the user made a typo
-                        normalizedDistance = Math.Min(normalizedDistance, threshold);
-                    }
-
-                    return (searchItem.item, Distance: normalizedDistance);
-                })
-                .Where(scoredfd => scoredfd.Distance <= threshold)
-                .OrderBy(scorefd => scorefd.Distance)
-                .Select(scoredfd => scoredfd.item);
-        }
-
-        /// <summary>
-        /// Initializes this Workspace without a language server.
-        /// </summary>
-        /// <param name="cancellationToken">A cancellation token that can be
-        /// used to cancel initialization.</param>
-        /// <remarks>
-        /// Workspaces deliver information about the changing state of the
-        /// project via their language server. If a Workspace has no language
-        /// server, it will not report on any changes.
-        /// </remarks>
-        internal void Initialize(CancellationToken cancellationToken = default)
-        {
-            // Initializing the workspace without a language server cannot be
-            // cancelled.
-            ReloadWorkspace(cancellationToken);
-        }
-
-        internal void ReloadWorkspace(CancellationToken cancellationToken)
+        internal void ReloadWorkspace()
         {
             // Find all actions defined in the workspace
-            if (this.Root != null)
-            {
+            if (this.Root != null) {
                 this.workspaceActions = new HashSet<Action>(this.FindWorkspaceActions(this.Root));
-            }
-            else
-            {
+            } else {
                 this.workspaceActions = new HashSet<Action>();
             }
 
             // Find all actions built in to this DLL
             try
             {
-                IEnumerable<Action> predefinedActions = GetPredefinedActions();
+                var thisAssembly = typeof(Workspace).Assembly;
+                var resources = thisAssembly.GetManifestResourceNames();
+                var jsonAssemblyFiles = resources.Where(r => r.EndsWith("ysls.json"));
 
-                foreach (var action in predefinedActions)
+                foreach (var doc in jsonAssemblyFiles)
                 {
-                    this.workspaceActions.Add(action);
+                    Stream? stream = thisAssembly.GetManifestResourceStream(doc);
+
+                    if (stream == null)
+                    {
+                        LanguageServer?.LogError($"Error while loading built-in actions from {doc}: manifest resource stream is null");
+                        continue;
+                    }
+
+                    try
+                    {
+                        string text = new StreamReader(stream).ReadToEnd();
+                        var docJsonConfig = new JsonConfigFile(text, true);
+
+                        foreach (var action in docJsonConfig.GetActions())
+                        {
+                            this.workspaceActions.Add(action);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        LanguageServer?.LogError($"Failed to load built-in definitions file {doc}: {e}");
+                    }
                 }
             }
-            catch (Exception e)
-            {
+            catch (Exception e) {
                 LanguageServer?.LogError($"Error while loading built-in actions: " + e);
             }
 
@@ -213,7 +132,7 @@ namespace YarnLanguageServer
                 {
                     try
                     {
-                        return new Project(path, this.Root);
+                        return new Project(path);
                     }
                     catch (System.Exception e)
                     {
@@ -223,8 +142,7 @@ namespace YarnLanguageServer
                 }).NonNull().ToList();
             }
 
-            if (!this.Projects.Any())
-            {
+            if (!this.Projects.Any()) {
                 // There are no .yarnprojects in the workspace. Create a new
                 // 'implicit' project at the root of the workspace that owns ALL
                 // Yarn files, as a convenience.
@@ -235,7 +153,7 @@ namespace YarnLanguageServer
                 // considered to be part of the workspace and will not be
                 // compiled. This is consistent with how Yarn Spinner for Unity
                 // works - if a file is not in a project, it is not compiled.)
-                Project implicitProject = new(Root, Root, isImplicit: true);
+                Project implicitProject = new (Root, isImplicit: true);
                 this.Projects = new[] { implicitProject };
 
                 // Additionally, if the workspace contains an actions definition
@@ -256,6 +174,7 @@ namespace YarnLanguageServer
 
                         try
                         {
+
                             var definitionFile = new JsonConfigFile(File.ReadAllText(definitionFilePath), false);
 
                             foreach (var action in definitionFile.GetActions())
@@ -279,7 +198,7 @@ namespace YarnLanguageServer
                 project.NotificationSender = this;
 
                 // When a project reloads, publish diagnostics.
-                project.OnProjectCompiled += (compilationResult) =>
+                project.OnProjectCompiled += () =>
                 {
                     PublishDiagnostics();
                     PublishNodeInfos();
@@ -288,11 +207,38 @@ namespace YarnLanguageServer
                 // Reload the project without notifying. (When we load a
                 // workspace, all projects will reload at once, so we'll wait
                 // until they're all created.)
-                project.ReloadProjectFromDisk(false, cancellationToken);
+                project.ReloadProjectFromDisk(false);
             }
 
             this.PublishDiagnostics();
             this.PublishNodeInfos();
+        }
+
+        private IEnumerable<Action> FindWorkspaceActions(string root)
+        {
+            var csharpWorkspaceFiles = System.IO.Directory.EnumerateFiles(root, "*.cs", System.IO.SearchOption.AllDirectories);
+
+            // Filter out any C# files that are in Unity directories not
+            // directly authored by the user
+            csharpWorkspaceFiles = csharpWorkspaceFiles.Where(f => !f.Contains("PackageCache") && !f.Contains("Library"));
+
+            foreach (var file in csharpWorkspaceFiles)
+            {
+                var text = System.IO.File.ReadAllText(file);
+
+                if (!text.ContainsAny("YarnCommand", "YarnFunction", "AddCommandHandler", "AddFunction"))
+                {
+                    // This C# file doesn't contain any Yarn functions, so skip
+                    // it
+                    continue;
+                }
+
+                var uri = new Uri(file);
+                foreach (var action in CSharpFileData.ParseActionsFromCode(text, uri))
+                {
+                    yield return action;
+                }
+            }
         }
 
         internal Dictionary<Uri, IEnumerable<Diagnostic>> GetDiagnostics()
@@ -338,14 +284,44 @@ namespace YarnLanguageServer
         }
 
         /// <summary>
+        /// Sends the DidChangeNodesNotification message to the client, which
+        /// contains semantic information about the nodes in this file.
+        /// </summary>
+        /// <seealso cref="Commands.DidChangeNodesNotification"/>
+        public void PublishNodeInfos() {
+            foreach (var file in this.Projects.SelectMany(p => p.Files))
+            {
+                this.LanguageServer?.SendNotification(
+                    Commands.DidChangeNodesNotification, new NodesChangedParams
+                    {
+                        Uri = file.Uri,
+                        Nodes = file.NodeInfos,
+                    });
+            }
+        }
+
+        /// <summary>
+        /// Initializes this Workspace without a language server.
+        /// </summary>
+        /// <remarks>
+        /// Workspaces deliver information about the changing state of the
+        /// project via their language server. If a Workspace has no language
+        /// server, it will not report on any changes.
+        /// </remarks>
+        internal void Initialize()
+        {
+            ReloadWorkspace();
+        }
+
+        /// <summary>
         /// Initializes this Workspace without a language server.
         /// </summary>
         /// <inheritdoc cref="Initialize" path="/remarks"/>
         /// <param name="server">The language server to use.</param>
-        internal void Initialize(ILanguageServer server, CancellationToken cancellationToken)
+        internal void Initialize(ILanguageServer server)
         {
             this.LanguageServer = server;
-            Initialize(cancellationToken);
+            Initialize();
         }
 
         /// <summary>
@@ -367,36 +343,40 @@ namespace YarnLanguageServer
             });
         }
 
-        private IEnumerable<Action> FindWorkspaceActions(string root)
+        public void SendNotification<T>(string method, T @params)
         {
-            var csharpWorkspaceFiles = System.IO.Directory.EnumerateFiles(root, "*.cs", System.IO.SearchOption.AllDirectories);
-
-            // Filter out any C# files that are in Unity directories not
-            // directly authored by the user
-            csharpWorkspaceFiles = csharpWorkspaceFiles.Where(f => !f.Contains("PackageCache") && !f.Contains("Library"));
-
-            foreach (var file in csharpWorkspaceFiles)
-            {
-                var text = System.IO.File.ReadAllText(file);
-
-                if (!text.ContainsAny("YarnCommand", "YarnFunction", "AddCommandHandler", "AddFunction"))
-                {
-                    // This C# file doesn't contain any Yarn functions, so skip
-                    // it
-                    continue;
-                }
-
-                var uri = new Uri(file);
-                foreach (var action in CSharpFileData.ParseActionsFromCode(text, uri))
-                {
-                    yield return action;
-                }
-            }
+            this.LanguageServer?.SendNotification<T>(method, @params);
         }
+
+        internal static IEnumerable<T> FuzzySearchItem<T>(IEnumerable<(string Name, T Item)> items, string name, float threshold)
+        {
+            var lev = new Fastenshtein.Levenshtein(name.ToLower());
+
+            return items.Select(searchItem =>
+                {
+                    float distance = lev.DistanceFrom(searchItem.Name.ToLower());
+                    var normalizedDistance = distance / Math.Max(Math.Max(name.Length, searchItem.Name.Length), 1);
+
+                    if (distance <= 1
+                        || searchItem.Name.Contains(name, StringComparison.OrdinalIgnoreCase)
+                        || name.Contains(searchItem.Name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // include strings that contain each other even if they don't meet the threshold
+                        // usecase is more the user didn't finish typing instead of the user made a typo
+                        normalizedDistance = Math.Min(normalizedDistance, threshold);
+                    }
+
+                    return (searchItem.Item, Distance: normalizedDistance);
+                })
+                .Where(scoredfd => scoredfd.Distance <= threshold)
+                .OrderBy(scorefd => scorefd.Distance)
+                .Select(scoredfd => scoredfd.Item);
+        }
+
+        IEnumerable<Action> IActionSource.GetActions() => this.workspaceActions;
     }
 
-    internal static class EnumerableExtension
-    {
+    internal static class EnumerableExtension {
         public static IEnumerable<T> NonNull<T>(this IEnumerable<T?> enumerable)
             where T : class
         {
