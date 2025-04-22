@@ -8,7 +8,7 @@ YARNSPINNER_FOLDER=.
 YARNSPINNER_DLLS_DIR=./Output/
 
 if [ ! -d $YARNSPINNER_DLLS_DIR ]; then
-    mkdir -p /Output
+    mkdir -p ./Output
 fi
 
 if [ -d .build-tmp ]; then 
